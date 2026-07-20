@@ -49,6 +49,8 @@ function HomeCalendar({ events = [], selectedDate, onSelectDate }) {
     return `${y}-${m}-${d}`;
   };
 
+  const todayStr = formatDateString(new Date());
+
   // Group events by date YYYY-MM-DD
   const eventsByDate = {};
   events.forEach((ev) => {
@@ -70,8 +72,6 @@ function HomeCalendar({ events = [], selectedDate, onSelectDate }) {
       eventsByDate[dateStr].tasksPending += 1;
     }
   });
-
-  const todayStr = formatDateString(new Date());
 
   // Generate calendar grid days
   const calendarGrid = [];

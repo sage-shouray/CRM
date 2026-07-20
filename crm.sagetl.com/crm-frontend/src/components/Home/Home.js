@@ -107,14 +107,15 @@ function Home() {
   });
 
   toDoTasks.forEach((task) => {
-    if (task.dueDate && !task.completed) {
+    if (task.dueDate) {
       calendarEvents.push({
         id: task.id,
         type: 'task',
         date: task.dueDate,
         title: task.title,
         priority: task.priority,
-        category: task.category
+        category: task.category,
+        status: task.status || (task.completed ? 'done' : 'pending')
       });
     }
   });
