@@ -10,15 +10,39 @@ import {
   faExclamationCircle,
   faHistory,
   faCalendarAlt,
-  faTimes
+  faTimes,
+  faBuilding,
+  faAlignLeft,
+  faChevronDown,
+  faChevronUp
 } from "@fortawesome/free-solid-svg-icons";
+import axios from "axios";
 import "./HomeToDoWidget.css";
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
 
 function HomeToDoWidget({ onTaskUpdate }) {
   const userId = localStorage.getItem("userId") || "default";
   const todayStr = new Date().toISOString().split("T")[0];
 
-  // Initial default tasks if none exist
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = yesterdayDate.toISOString().split("T")[0];
+
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 3);
+  const tomorrowStr = tomorrowDate.toISOString().split("T")[0];
+
+  // Dummy fallback leads for testing if backend leads API is empty
+  const defaultDummyLeads = [
+    { leadNumber: "1001", companyName: "SAP Enterprise Solutions (TechCorp)" },
+    { leadNumber: "1002", companyName: "Global Logistics & Supply Chain" },
+    { leadNumber: "1003", companyName: "Cloud Matrix IT Infrastructure" },
+    { leadNumber: "1004", companyName: "Nexa Digital Systems" },
+    { leadNumber: "1005", companyName: "Acme Apex Industrial Corp" }
+  ];
+
+  // Initial default tasks pre-populated with dummy data for testing
   const getInitialTasks = () => {
     const saved = localStorage.getItem(`crm_tasks_${userId}`);
     if (saved) {
@@ -32,15 +56,12 @@ function HomeToDoWidget({ onTaskUpdate }) {
       }
     }
     
-    // Default sample data with past overdue task to showcase carry forward
-    const yesterdayDate = new Date();
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayStr = yesterdayDate.toISOString().split("T")[0];
-
     return [
       {
         id: "task-1",
-        title: "Follow up with SAP ERP Lead #1002 (Call Back)",
+        title: "Follow up with SAP ERP Lead #1002 (Call Back for Proposal)",
+        associatedLead: "SAP Enterprise Solutions (TechCorp)",
+        description: "Client requested updated SLA uptime guarantees and 256-bit encryption compliance documentation before contract signing.",
         originalDueDate: yesterdayStr,
         dueDate: yesterdayStr,
         priority: "High",
@@ -49,7 +70,9 @@ function HomeToDoWidget({ onTaskUpdate }) {
       },
       {
         id: "task-2",
-        title: "Review daily unassigned lead queue and assign to team",
+        title: "Review daily unassigned lead queue and assign to team subusers",
+        associatedLead: "Global Logistics & Supply Chain",
+        description: "Verify incoming lead form entries, check phone numbers, and assign high-turnover accounts to Vaidehi and Tejal.",
         originalDueDate: todayStr,
         dueDate: todayStr,
         priority: "Medium",
@@ -58,34 +81,77 @@ function HomeToDoWidget({ onTaskUpdate }) {
       },
       {
         id: "task-3",
-        title: "Prepare weekly CRM pipeline summary report",
+        title: "Prepare weekly CRM pipeline summary report for Admin review",
+        associatedLead: "General / Management",
+        description: "Compile total conversion statistics, supervisor follow-up completion rates, and weekly lead acquisition counts.",
         originalDueDate: todayStr,
         dueDate: todayStr,
         priority: "Low",
         status: "done",
         category: "Report"
+      },
+      {
+        id: "task-4",
+        title: "Cloud Matrix Infrastructure SLA demonstration meeting",
+        associatedLead: "Cloud Matrix IT Infrastructure",
+        description: "Rescheduled live demonstration of CRM features and profile password provisions.",
+        originalDueDate: todayStr,
+        dueDate: tomorrowStr,
+        priority: "High",
+        status: "postponed",
+        category: "Meeting"
       }
     ];
   };
 
   const [tasks, setTasks] = useState(getInitialTasks);
+  const [availableLeads, setAvailableLeads] = useState(defaultDummyLeads);
   const [activeFilter, setActiveFilter] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
   const [postponeTaskId, setPostponeTaskId] = useState(null);
   const [postponeDate, setPostponeDate] = useState("");
+  const [expandedTaskIds, setExpandedTaskIds] = useState({});
 
   const [newTask, setNewTask] = useState({
     title: "",
+    associatedLead: "",
+    description: "",
     dueDate: todayStr,
     priority: "Medium",
     category: "General"
   });
 
+  // Fetch created leads from system backend
+  useEffect(() => {
+    const fetchLeadsForSelection = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const res = await axios.get(`${API_BASE_URL}/api/leads`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          const mapped = res.data.map((l) => ({
+            leadNumber: l.leadNumber,
+            companyName: l.companyInfo?.companyName || `Lead #${l.leadNumber}`
+          }));
+          // Merge with default dummy leads so testing always has options
+          setAvailableLeads([...mapped, ...defaultDummyLeads]);
+        }
+      } catch (err) {
+        console.error("Error fetching leads for task creation:", err);
+      }
+    };
+
+    fetchLeadsForSelection();
+  }, []);
+
   // Automatically compute carried forward & not_done status for past tasks
   useEffect(() => {
     setTasks((prevTasks) =>
       prevTasks.map((t) => {
-        // If task is from a past date and not marked done or postponed, set status = not_done
         if (t.dueDate < todayStr && t.status !== "done" && t.status !== "postponed") {
           return { ...t, status: "not_done" };
         }
@@ -100,6 +166,13 @@ function HomeToDoWidget({ onTaskUpdate }) {
       onTaskUpdate(tasks);
     }
   }, [tasks, userId]);
+
+  const toggleExpandDescription = (taskId) => {
+    setExpandedTaskIds((prev) => ({
+      ...prev,
+      [taskId]: !prev[taskId]
+    }));
+  };
 
   // Status Action 1: Mark Done
   const handleMarkDone = (taskId) => {
@@ -146,6 +219,8 @@ function HomeToDoWidget({ onTaskUpdate }) {
     const taskObj = {
       id: "task-" + Date.now(),
       title: newTask.title.trim(),
+      associatedLead: newTask.associatedLead || "General / None",
+      description: newTask.description.trim(),
       originalDueDate: newTask.dueDate || todayStr,
       dueDate: newTask.dueDate || todayStr,
       priority: newTask.priority,
@@ -156,6 +231,8 @@ function HomeToDoWidget({ onTaskUpdate }) {
     setTasks((prev) => [taskObj, ...prev]);
     setNewTask({
       title: "",
+      associatedLead: "",
+      description: "",
       dueDate: todayStr,
       priority: "Medium",
       category: "General"
@@ -207,7 +284,7 @@ function HomeToDoWidget({ onTaskUpdate }) {
                 <FontAwesomeIcon icon={faListCheck} className="modal-title-icon" />
                 <div>
                   <h3>Create New Work Task</h3>
-                  <p>Add an operational action item or daily task to your schedule</p>
+                  <p>Select a lead, enter task description, and assign action schedule</p>
                 </div>
               </div>
               <button
@@ -221,8 +298,26 @@ function HomeToDoWidget({ onTaskUpdate }) {
             </div>
 
             <form onSubmit={handleAddTaskSubmit} className="add-task-modal-form">
+              {/* Select Associated Lead Dropdown */}
               <div className="modal-form-group">
-                <label>Task Description / Title <span className="req-star">*</span></label>
+                <label><FontAwesomeIcon icon={faBuilding} className="label-icon" /> Select Associated Lead</label>
+                <select
+                  value={newTask.associatedLead}
+                  onChange={(e) => setNewTask({ ...newTask, associatedLead: e.target.value })}
+                  className="modal-input-select"
+                >
+                  <option value="">-- General Work (No Specific Lead) --</option>
+                  {availableLeads.map((l, idx) => (
+                    <option key={idx} value={l.companyName}>
+                      {l.companyName} (Lead #{l.leadNumber})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Task Title Input */}
+              <div className="modal-form-group">
+                <label>Task Title / Title Name <span className="req-star">*</span></label>
                 <input
                   type="text"
                   placeholder="e.g. Follow up with SAP ERP lead for contract signing..."
@@ -234,6 +329,19 @@ function HomeToDoWidget({ onTaskUpdate }) {
                 />
               </div>
 
+              {/* Task Description Textarea */}
+              <div className="modal-form-group">
+                <label><FontAwesomeIcon icon={faAlignLeft} className="label-icon" /> Task Description & Action Notes</label>
+                <textarea
+                  placeholder="Enter detailed action plan, call notes, or instructions for this task..."
+                  value={newTask.description}
+                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                  rows={3}
+                  className="modal-input-textarea"
+                />
+              </div>
+
+              {/* Form Grid: Due Date, Priority, Category */}
               <div className="modal-form-grid">
                 <div className="modal-form-group">
                   <label>Due Date <span className="req-star">*</span></label>
@@ -341,6 +449,7 @@ function HomeToDoWidget({ onTaskUpdate }) {
             const isOverdueNotDone = (task.originalDueDate && task.originalDueDate < todayStr && task.status !== "done" && task.status !== "postponed") || task.status === "not_done";
             const isPostponed = task.status === "postponed";
             const isDone = task.status === "done";
+            const isExpanded = !!expandedTaskIds[task.id];
 
             return (
               <div
@@ -356,12 +465,32 @@ function HomeToDoWidget({ onTaskUpdate }) {
                     </div>
                   )}
 
+                  {/* Task Header Line with Title */}
                   <div className="task-header-line">
                     <span className={`task-title ${isDone ? "strike-through" : ""}`}>
                       {task.title}
                     </span>
                   </div>
 
+                  {/* Associated Lead Tag */}
+                  {task.associatedLead && (
+                    <div className="task-associated-lead">
+                      <FontAwesomeIcon icon={faBuilding} className="lead-tag-icon" />
+                      <span>Lead: <strong>{task.associatedLead}</strong></span>
+                    </div>
+                  )}
+
+                  {/* Optional Expandable Description */}
+                  {task.description && (
+                    <div className="task-description-box">
+                      <div className="desc-preview">
+                        <FontAwesomeIcon icon={faAlignLeft} className="desc-icon" />
+                        <span className="desc-text">{task.description}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Metadata Row: Status, Priority, Category, Date */}
                   <div className="task-meta-tags">
                     {/* Status Pill */}
                     {isDone ? (

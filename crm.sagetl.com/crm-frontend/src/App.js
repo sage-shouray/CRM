@@ -129,6 +129,33 @@ function App() {
             }
           />
           <Route
+            path="/todo"
+            element={
+              <PrivateRoute
+                element={<ToDo />}
+                allowedRoles={["subuser", "supervisor", "admin"]}
+              />
+            }
+          />
+          <Route
+            path="/to-do"
+            element={
+              <PrivateRoute
+                element={<ToDo />}
+                allowedRoles={["subuser", "supervisor", "admin"]}
+              />
+            }
+          />
+          <Route
+            path="/add-task"
+            element={
+              <PrivateRoute
+                element={<ToDo />}
+                allowedRoles={["subuser", "supervisor", "admin"]}
+              />
+            }
+          />
+          <Route
             path="/admin/dashboard"
             element={
               <PrivateRoute
