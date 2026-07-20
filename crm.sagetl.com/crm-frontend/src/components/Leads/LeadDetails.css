@@ -1,0 +1,278 @@
+/* Overall Modal Overlay */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+/* Modal Content Card */
+.modal-content {
+  background-color: #ffffff;
+  padding: 30px;
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 1200px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--slate-200);
+  position: relative;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* Heading */
+.modal-content h2 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--slate-900);
+  margin-top: 0;
+  margin-bottom: 20px;
+  letter-spacing: -0.5px;
+  border-bottom: 1.5px solid var(--slate-200);
+  padding-bottom: 15px;
+  text-align: left;
+}
+
+/* Button overrides based on child position in modal-content header */
+.modal-content > button {
+  padding: 10px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: none;
+  transition: all var(--transition-fast);
+  margin-right: 8px;
+  margin-bottom: 24px;
+}
+
+/* Close Button (1st button) */
+.modal-content > button:nth-of-type(1) {
+  background-color: var(--slate-100);
+  color: var(--slate-700);
+  border: 1.5px solid var(--slate-200);
+}
+
+.modal-content > button:nth-of-type(1):hover {
+  background-color: var(--slate-200);
+  color: var(--slate-900);
+}
+
+/* Edit / Cancel Button (2nd button) */
+.modal-content > button:nth-of-type(2) {
+  background: var(--slate-800);
+  color: white;
+}
+
+.modal-content > button:nth-of-type(2):hover {
+  background-color: var(--slate-900);
+  transform: translateY(-1px);
+}
+
+/* Save Changes Button (3rd button) */
+.modal-content > button:nth-of-type(3) {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.modal-content > button:nth-of-type(3):hover {
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Add Description Button */
+.form-section-ld button {
+  padding: 10px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: none;
+  background: var(--primary-gradient);
+  color: white;
+  box-shadow: 0 4px 12px rgba(211, 100, 11, 0.2);
+  transition: all var(--transition-fast);
+  margin-top: 10px;
+}
+
+.form-section-ld button:hover {
+  box-shadow: 0 6px 16px rgba(211, 100, 11, 0.35);
+  transform: translateY(-1px);
+}
+
+.form-section-ld button:disabled {
+  background: var(--slate-200);
+  color: var(--slate-400);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Form Sections */
+.form-section-ld {
+  background-color: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.form-section-ld h3 {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--slate-800);
+  margin-top: 0;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1.5px solid var(--slate-200);
+  padding-bottom: 8px;
+}
+
+.form-section-ld h4 {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--slate-600);
+  margin-top: 15px;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Form Row and Group */
+.form-row-ld {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: flex-end;
+}
+
+.form-group-ld {
+  flex: 1;
+  min-width: 240px;
+  margin-right: 0;
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group-ld label,
+.form-group label {
+  color: var(--slate-700);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.form-group-ld input,
+.form-group-ld select,
+.form-group-ld textarea,
+.form-group textarea,
+.form-group-small input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  font-family: inherit;
+  border: 1.5px solid var(--slate-200);
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  box-sizing: border-box;
+  transition: all var(--transition-fast);
+}
+
+.form-group-ld input:focus,
+.form-group-ld select:focus,
+.form-group-ld textarea:focus,
+.form-group textarea:focus,
+.form-group-small input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.form-group-ld input:disabled,
+.form-group-ld select:disabled,
+.form-group-ld textarea:disabled,
+.form-group textarea:disabled,
+.form-group-small input:disabled {
+  background-color: var(--slate-100);
+  color: var(--slate-500);
+  border-color: var(--slate-200);
+  cursor: not-allowed;
+}
+
+.form-group-small {
+  flex: 0.5;
+  min-width: 150px;
+  margin-right: 0;
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.form-group textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Descriptions Table styling */
+.descriptions-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 20px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--slate-200);
+}
+
+.descriptions-table th,
+.descriptions-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.descriptions-table th {
+  background-color: var(--slate-100);
+  color: var(--slate-700);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.descriptions-table td {
+  background-color: #ffffff;
+  color: var(--slate-700);
+  font-size: 13px;
+}
+
+.descriptions-table tr:last-child td {
+  border-bottom: none;
+}
+
+.descriptions-table tr:hover td {
+  background-color: var(--slate-50);
+}
+
+

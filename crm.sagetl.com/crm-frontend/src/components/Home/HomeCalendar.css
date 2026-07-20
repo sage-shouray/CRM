@@ -1,0 +1,255 @@
+.home-calendar-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    text-align: left;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.calendar-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.calendar-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.calendar-header-icon {
+    font-size: 16px;
+    color: #D3640B;
+    background: rgba(211, 100, 11, 0.1);
+    padding: 8px;
+    border-radius: 8px;
+}
+
+.calendar-title-group h2 {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+    letter-spacing: -0.3px;
+}
+
+.calendar-nav-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-today-shortcut {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-today-shortcut:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.btn-cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    color: #475569;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-cal-nav:hover {
+    background: #D3640B;
+    border-color: #D3640B;
+    color: #ffffff;
+}
+
+.calendar-weekdays-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #64748b;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.weekday-cell {
+    padding: 2px 0;
+}
+
+.calendar-days-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.calendar-day-cell {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    min-height: 52px;
+    padding: 4px 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+}
+
+.calendar-day-cell:hover {
+    border-color: #D3640B;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(211, 100, 11, 0.12);
+}
+
+.other-month {
+    opacity: 0.35;
+    background: #ffffff;
+}
+
+.today-day {
+    background: rgba(211, 100, 11, 0.05);
+    border-color: rgba(211, 100, 11, 0.4);
+}
+
+.selected-day {
+    border-color: #D3640B !important;
+    box-shadow: 0 0 0 2.5px rgba(211, 100, 11, 0.25) !important;
+    background: #ffffff !important;
+}
+
+.day-number-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.day-num {
+    font-size: 12px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.today-badge {
+    background: #D3640B;
+    color: #ffffff;
+    font-size: 8px;
+    font-weight: 800;
+    padding: 1px 4px;
+    border-radius: 6px;
+    letter-spacing: 0.3px;
+}
+
+.day-event-indicators {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 2px;
+}
+
+.event-pill {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.followup-pill {
+    background: rgba(211, 100, 11, 0.15);
+    color: #b55409;
+    border: 1px solid rgba(211, 100, 11, 0.3);
+}
+
+.done-pill {
+    background: rgba(16, 185, 129, 0.18);
+    color: #047857;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.not-done-pill {
+    background: rgba(239, 68, 68, 0.18);
+    color: #b91c1c;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.pending-pill {
+    background: rgba(59, 130, 246, 0.15);
+    color: #1d4ed8;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.pill-icon {
+    font-size: 8px;
+}
+
+.calendar-legend-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #f1f5f9;
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.dot-followup {
+    background: #D3640B;
+}
+
+.dot-done {
+    background: #10b981;
+}
+
+.dot-not-done {
+    background: #ef4444;
+}
+
+.dot-selected {
+    background: #ffffff;
+    border: 2px solid #D3640B;
+}

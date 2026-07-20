@@ -1,0 +1,475 @@
+.home-todo-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    text-align: left;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.todo-widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.widget-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.widget-header-icon {
+    font-size: 16px;
+    color: #D3640B;
+    background: rgba(211, 100, 11, 0.1);
+    padding: 8px;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.widget-title-group h3 {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 2px 0;
+    letter-spacing: -0.3px;
+}
+
+.widget-title-group p {
+    font-size: 11.5px;
+    color: #64748b;
+    margin: 0;
+}
+
+.btn-add-task-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #D3640B;
+    color: #ffffff;
+    border: none;
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(211, 100, 11, 0.2);
+    transition: all 0.15s ease;
+}
+
+.btn-add-task-primary:hover {
+    background: #b55409;
+}
+
+/* Inline Add Task Form */
+.add-task-inline-form {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.task-input-title {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.task-input-title:focus {
+    outline: none;
+    border-color: #D3640B;
+}
+
+.form-meta-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.form-meta-field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 90px;
+}
+
+.form-meta-field label {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #475569;
+}
+
+.form-meta-field input,
+.form-meta-field select {
+    padding: 6px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    background: #ffffff;
+}
+
+.btn-save-task {
+    background: #0f172a;
+    color: #ffffff;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* Filter Tabs Segmented Control */
+.todo-filter-tabs {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 3px;
+}
+
+.tabs-group {
+    display: flex;
+    gap: 2px;
+
+}
+
+.filter-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 5px 6px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+}
+
+.filter-tab:hover {
+    color: #0f172a;
+}
+
+.active-tab {
+    background: #ffffff !important;
+    color: #D3640B !important;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.active-tab-green {
+    background: #10b981 !important;
+    color: #ffffff !important;
+    font-weight: 700;
+}
+
+.active-tab-red {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    font-weight: 700;
+}
+
+.active-tab-amber {
+    background: #f59e0b !important;
+    color: #ffffff !important;
+    font-weight: 700;
+}
+
+/* Items List */
+.todo-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 340px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.todo-item-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 14px;
+    transition: all 0.15s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.prio-border-high {
+    border-left: 4px solid #ef4444 !important;
+}
+
+.prio-border-medium {
+    border-left: 4px solid #f59e0b !important;
+}
+
+.prio-border-low {
+    border-left: 4px solid #3b82f6 !important;
+}
+
+.status-not_done {
+    background: #fff5f5;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.status-done {
+    background: #f0fdf4;
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.status-postponed {
+    background: #fffbe6;
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* Overdue Carry Forward Notice */
+.carry-forward-notice {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #dc2626;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.task-body-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.task-header-line {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+.task-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.35;
+}
+
+.strike-through {
+    text-decoration: line-through;
+    color: #64748b;
+}
+
+.task-meta-tags {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* Status Pills */
+.status-pill {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.pill-done {
+    background: rgba(16, 185, 129, 0.15);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.pill-not-done {
+    background: rgba(239, 68, 68, 0.15);
+    color: #dc2626;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.pill-postponed {
+    background: rgba(245, 158, 11, 0.15);
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.pill-pending {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.priority-tag {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.tag-high {
+    background: rgba(239, 68, 68, 0.12);
+    color: #dc2626;
+}
+
+.tag-medium {
+    background: rgba(245, 158, 11, 0.12);
+    color: #d97706;
+}
+
+.tag-low {
+    background: rgba(59, 130, 246, 0.12);
+    color: #2563eb;
+}
+
+.category-tag {
+    background: #f1f5f9;
+    color: #475569;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.due-date-tag {
+    color: #64748b;
+    font-size: 10.5px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+/* 3 Status Action Buttons Bar (Done, Postpone, Not Done) */
+.task-status-actions-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px dashed #e2e8f0;
+}
+
+.btn-status-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s ease;
+}
+
+.btn-act-done {
+    background: rgba(16, 185, 129, 0.15);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.btn-act-done:hover {
+    background: #10b981;
+    color: #ffffff;
+}
+
+.btn-act-postpone {
+    background: rgba(245, 158, 11, 0.15);
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.btn-act-postpone:hover {
+    background: #f59e0b;
+    color: #ffffff;
+}
+
+.btn-act-not-done {
+    background: rgba(239, 68, 68, 0.15);
+    color: #dc2626;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.btn-act-not-done:hover {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+/* Postpone Popover Box */
+.postpone-popover-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 1px solid #f59e0b;
+    padding: 8px 10px;
+    border-radius: 8px;
+    margin-top: 6px;
+    font-size: 11.5px;
+}
+
+.postpone-popover-box label {
+    font-weight: 700;
+    color: #d97706;
+}
+
+.postpone-popover-box input {
+    padding: 3px 6px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.btn-confirm-postpone {
+    background: #f59e0b;
+    color: #ffffff;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn-cancel-postpone {
+    background: #f1f5f9;
+    color: #475569;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.empty-tasks-state {
+    padding: 30px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 12px;
+}

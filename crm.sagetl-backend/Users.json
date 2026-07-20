@@ -1,0 +1,26 @@
+[
+    {
+    "name": "Nishtha",
+    "email": "nichawla@sagetl.com",
+    "password": "Sage123",
+    "role": "admin",
+    "userId": "ADM001"
+  },
+
+  {
+    "name": "Vaidehi Bhardwaj",
+    "email": "bhardwajvaidehi12@gmail.com",
+    "password": "vaidehi123",
+    "role": "supervisor",
+    "userId": "SUP001"
+  },
+  {
+    "name": "Tejal Mahur",
+    "email": "tejalmahur16@gmail.com",
+    "password": "tejal123",
+    "role": "subuser",
+    "userId": "SUB001",
+    "supervisorEmail": "bhardwajvaidehi12@gmail.com"
+  }
+
+]

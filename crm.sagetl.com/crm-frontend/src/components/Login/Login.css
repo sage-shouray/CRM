@@ -1,0 +1,384 @@
+.login-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: #f1f5f9;
+    background-image: 
+        radial-gradient(at 100% 0%, rgba(211, 100, 11, 0.05) 0px, transparent 40%),
+        radial-gradient(at 0% 100%, rgba(30, 41, 59, 0.04) 0px, transparent 40%);
+    justify-content: space-between;
+}
+
+.top-branding-bar {
+    height: 6px;
+    background: linear-gradient(90deg, #D3640B 0%, #f97316 50%, #1e293b 100%);
+}
+
+.main-content {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 36px 20px;
+}
+
+/* Enlarge login container card - crisp, realistic, professional dimensions */
+.login-container {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+    padding: 32px;
+    width: 100%;
+    max-width: 1080px;
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 36px;
+    min-height: 580px;
+    box-sizing: border-box;
+}
+
+/* Left Showcase Panel - Executive Dark Corporate Theme */
+.image-box {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+    border-radius: 16px;
+    padding: 36px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.4);
+    box-sizing: border-box;
+}
+
+.brand-header {
+    z-index: 2;
+    margin-bottom: 24px;
+}
+
+.logo {
+    max-width: 220px;
+    height: auto;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25));
+}
+
+.highlights-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1;
+    z-index: 2;
+}
+
+.headline-group h2 {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 10px 0;
+    letter-spacing: -0.4px;
+}
+
+.highlights-sub {
+    font-size: 14px;
+    color: #94a3b8;
+    line-height: 1.55;
+    margin: 0 0 28px 0;
+}
+
+.feature-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.feature-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.feature-icon {
+    color: #D3640B;
+    font-size: 18px;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.feature-item h3 {
+    color: #f8fafc;
+    font-size: 14.5px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+}
+
+.feature-item p {
+    color: #cbd5e1;
+    font-size: 12.5px;
+    line-height: 1.45;
+    margin: 0;
+}
+
+/* Authentic map watermark image background */
+.map-backdrop {
+    position: absolute;
+    bottom: -20px;
+    right: -20px;
+    max-width: 280px;
+    height: auto;
+    opacity: 0.12;
+    pointer-events: none;
+    z-index: 1;
+    filter: invert(1);
+}
+
+/* Right Sign In Form Panel */
+.box {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 10px 10px 10px 4px;
+    box-sizing: border-box;
+}
+
+.form-header {
+    margin-bottom: 28px;
+}
+
+.box h1 {
+    color: #0f172a;
+    font-size: 26px;
+    font-weight: 800;
+    margin: 0 0 8px 0;
+    letter-spacing: -0.5px;
+}
+
+.form-subtitle {
+    color: #64748b;
+    font-size: 14px;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+label {
+    color: #334155;
+    font-weight: 600;
+    font-size: 13px;
+    text-align: left;
+}
+
+.input-with-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 14px;
+    color: #94a3b8;
+    font-size: 14px;
+    pointer-events: none;
+    transition: color var(--transition-fast, 0.15s ease);
+}
+
+.input-with-icon input {
+    width: 100%;
+    padding: 13px 40px 13px 40px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #0f172a;
+    background-color: #f8fafc;
+    box-sizing: border-box;
+    transition: all 0.15s ease;
+}
+
+.input-with-icon input:focus {
+    outline: none;
+    border-color: #D3640B;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(211, 100, 11, 0.14);
+}
+
+.input-with-icon input:focus + .input-icon,
+.input-with-icon input:focus ~ .input-icon {
+    color: #D3640B;
+}
+
+.toggle-password-btn {
+    position: absolute;
+    right: 12px;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    border-radius: 6px;
+    transition: color 0.15s ease;
+}
+
+.toggle-password-btn:hover {
+    color: #334155;
+}
+
+.forgot-password {
+    color: #D3640B;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.forgot-password:hover {
+    color: #b55409;
+    text-decoration: underline;
+}
+
+/* Primary Corporate Submit Button */
+.btn-login {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #D3640B;
+    color: #ffffff;
+    border: none;
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(211, 100, 11, 0.22);
+    transition: all 0.15s ease;
+    margin-top: 8px;
+}
+
+.btn-login:hover:not(:disabled) {
+    background: #b55409;
+    box-shadow: 0 6px 16px rgba(211, 100, 11, 0.32);
+}
+
+.btn-login:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.btn-login:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.btn-icon {
+    font-size: 13px;
+}
+
+.btn-spinner {
+    font-size: 15px;
+}
+
+/* Corporate Footer */
+.footer {
+    padding: 16px 20px;
+    background-color: #0f172a;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 12px;
+    border-top: 1px solid #1e293b;
+}
+
+.footer p {
+    margin: 0;
+}
+
+/* Responsive Styles */
+@media (max-width: 960px) {
+    .login-container {
+        max-width: 840px;
+        min-height: 520px;
+        grid-template-columns: 1fr 1fr;
+        padding: 24px;
+        gap: 24px;
+    }
+
+    .image-box {
+        padding: 28px 24px;
+    }
+
+    .box h1 {
+        font-size: 22px;
+    }
+}
+
+@media (max-width: 768px) {
+    .login-container {
+        grid-template-columns: 1fr;
+        max-width: 460px;
+        min-height: auto;
+        padding: 24px;
+    }
+
+    .image-box {
+        padding: 24px;
+    }
+
+    .highlights-container {
+        display: none;
+    }
+
+    .brand-header {
+        margin-bottom: 0;
+    }
+
+    .logo {
+        max-width: 180px;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-content {
+        padding: 20px 12px;
+    }
+
+    .login-container {
+        padding: 20px;
+        border-radius: 16px;
+    }
+
+    .box h1 {
+        font-size: 20px;
+    }
+
+    .input-with-icon input {
+        padding: 11px 36px 11px 36px;
+        font-size: 13.5px;
+    }
+
+    .btn-login {
+        padding: 12px 18px;
+        font-size: 14.5px;
+    }
+}
