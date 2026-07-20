@@ -67,72 +67,213 @@
     background: #b55409;
 }
 
-/* Inline Add Task Form */
-.add-task-inline-form {
-    background: #f8fafc;
-    border: 1px solid #cbd5e1;
-    border-radius: 12px;
-    padding: 12px;
+/* Pop-up Modal Window Styling */
+.add-task-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
     display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.task-input-title {
-    width: 100%;
-    padding: 9px 12px;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    font-size: 13px;
-    font-family: inherit;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
     box-sizing: border-box;
 }
 
-.task-input-title:focus {
+.add-task-modal-dialog {
+    background: #ffffff;
+    border-radius: 18px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modalPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPopIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal-header-bar {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    padding: 20px 24px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.modal-title-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+}
+
+.modal-title-icon {
+    font-size: 20px;
+    color: #D3640B;
+    background: rgba(211, 100, 11, 0.2);
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.modal-title-box h3 {
+    font-size: 18px;
+    font-weight: 800;
+    margin: 0 0 2px 0;
+    color: #ffffff;
+}
+
+.modal-title-box p {
+    font-size: 12px;
+    color: #94a3b8;
+    margin: 0;
+}
+
+.btn-modal-close {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #94a3b8;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.btn-modal-close:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.add-task-modal-form {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    text-align: left;
+}
+
+.modal-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.modal-form-group label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #334155;
+}
+
+.req-star {
+    color: #dc2626;
+}
+
+.modal-input-text {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-family: inherit;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease;
+}
+
+.modal-input-text:focus {
+    outline: none;
+    border-color: #D3640B;
+    box-shadow: 0 0 0 3px rgba(211, 100, 11, 0.15);
+}
+
+.modal-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 14px;
+}
+
+.modal-input-select {
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #ffffff;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.modal-input-select:focus {
     outline: none;
     border-color: #D3640B;
 }
 
-.form-meta-row {
+.modal-footer-actions {
     display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid #f1f5f9;
+    margin-top: 6px;
 }
 
-.form-meta-field {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex: 1;
-    min-width: 90px;
-}
-
-.form-meta-field label {
-    font-size: 10.5px;
-    font-weight: 700;
-    color: #475569;
-}
-
-.form-meta-field input,
-.form-meta-field select {
-    padding: 6px 8px;
+.btn-modal-cancel {
+    background: #f1f5f9;
     border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    font-size: 12px;
-    font-family: inherit;
-    background: #ffffff;
-}
-
-.btn-save-task {
-    background: #0f172a;
-    color: #ffffff;
-    border: none;
-    padding: 7px 14px;
-    border-radius: 6px;
-    font-size: 12px;
+    color: #475569;
+    padding: 9px 18px;
+    border-radius: 10px;
+    font-size: 13px;
     font-weight: 700;
     cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-modal-cancel:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.btn-modal-save {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #D3640B;
+    border: none;
+    color: #ffffff;
+    padding: 9px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(211, 100, 11, 0.3);
+    transition: all 0.15s ease;
+}
+
+.btn-modal-save:hover {
+    background: #b55409;
+    transform: translateY(-1px);
 }
 
 /* Filter Tabs Segmented Control */

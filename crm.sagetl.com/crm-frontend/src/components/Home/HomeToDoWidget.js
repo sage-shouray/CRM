@@ -9,7 +9,8 @@ import {
   faCalendarDay,
   faExclamationCircle,
   faHistory,
-  faCalendarAlt
+  faCalendarAlt,
+  faTimes
 } from "@fortawesome/free-solid-svg-icons";
 import "./HomeToDoWidget.css";
 
@@ -69,7 +70,7 @@ function HomeToDoWidget({ onTaskUpdate }) {
 
   const [tasks, setTasks] = useState(getInitialTasks);
   const [activeFilter, setActiveFilter] = useState("all");
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [postponeTaskId, setPostponeTaskId] = useState(null);
   const [postponeDate, setPostponeDate] = useState("");
 
@@ -159,7 +160,7 @@ function HomeToDoWidget({ onTaskUpdate }) {
       priority: "Medium",
       category: "General"
     });
-    setShowAddForm(false);
+    setShowAddModal(false);
   };
 
   // Filter tasks based on status / carry forward
@@ -189,71 +190,106 @@ function HomeToDoWidget({ onTaskUpdate }) {
         </div>
 
         <button
-          onClick={() => setShowAddForm(!showAddForm)}
+          onClick={() => setShowAddModal(true)}
           className="btn-add-task-primary"
         >
           <FontAwesomeIcon icon={faPlus} />
-          <span>{showAddForm ? "Cancel" : "Add Task"}</span>
+          <span>Add Task</span>
         </button>
       </div>
 
-      {/* Inline Form to Add New Task */}
-      {showAddForm && (
-        <form onSubmit={handleAddTaskSubmit} className="add-task-inline-form">
-          <div className="form-row">
-            <input
-              type="text"
-              placeholder="Enter task title or work description..."
-              value={newTask.title}
-              onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-              required
-              className="task-input-title"
-              autoFocus
-            />
-          </div>
-
-          <div className="form-meta-row">
-            <div className="form-meta-field">
-              <label>Due Date</label>
-              <input
-                type="date"
-                value={newTask.dueDate}
-                onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="form-meta-field">
-              <label>Priority</label>
-              <select
-                value={newTask.priority}
-                onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+      {/* Pop-up Modal Window for Creating New Task */}
+      {showAddModal && (
+        <div className="add-task-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="add-task-modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header-bar">
+              <div className="modal-title-box">
+                <FontAwesomeIcon icon={faListCheck} className="modal-title-icon" />
+                <div>
+                  <h3>Create New Work Task</h3>
+                  <p>Add an operational action item or daily task to your schedule</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-modal-close"
+                onClick={() => setShowAddModal(false)}
+                title="Close"
               >
-                <option value="High">High Priority</option>
-                <option value="Medium">Medium Priority</option>
-                <option value="Low">Low Priority</option>
-              </select>
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
             </div>
 
-            <div className="form-meta-field">
-              <label>Category</label>
-              <select
-                value={newTask.category}
-                onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
-              >
-                <option value="Follow-up">Follow-up</option>
-                <option value="Management">Management</option>
-                <option value="Report">Report</option>
-                <option value="Meeting">Meeting</option>
-                <option value="General">General</option>
-              </select>
-            </div>
+            <form onSubmit={handleAddTaskSubmit} className="add-task-modal-form">
+              <div className="modal-form-group">
+                <label>Task Description / Title <span className="req-star">*</span></label>
+                <input
+                  type="text"
+                  placeholder="e.g. Follow up with SAP ERP lead for contract signing..."
+                  value={newTask.title}
+                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                  required
+                  className="modal-input-text"
+                  autoFocus
+                />
+              </div>
 
-            <button type="submit" className="btn-save-task">
-              Save Task
-            </button>
+              <div className="modal-form-grid">
+                <div className="modal-form-group">
+                  <label>Due Date <span className="req-star">*</span></label>
+                  <input
+                    type="date"
+                    value={newTask.dueDate}
+                    onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                    required
+                    className="modal-input-select"
+                  />
+                </div>
+
+                <div className="modal-form-group">
+                  <label>Priority Level</label>
+                  <select
+                    value={newTask.priority}
+                    onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                    className="modal-input-select"
+                  >
+                    <option value="High">High Priority</option>
+                    <option value="Medium">Medium Priority</option>
+                    <option value="Low">Low Priority</option>
+                  </select>
+                </div>
+
+                <div className="modal-form-group">
+                  <label>Work Category</label>
+                  <select
+                    value={newTask.category}
+                    onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
+                    className="modal-input-select"
+                  >
+                    <option value="Follow-up">Follow-up</option>
+                    <option value="Management">Management</option>
+                    <option value="Report">Report</option>
+                    <option value="Meeting">Meeting</option>
+                    <option value="General">General</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="modal-footer-actions">
+                <button
+                  type="button"
+                  className="btn-modal-cancel"
+                  onClick={() => setShowAddModal(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-modal-save">
+                  <FontAwesomeIcon icon={faPlus} /> Save Task
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
+        </div>
       )}
 
       {/* Filter Segmented Control Bar */}
