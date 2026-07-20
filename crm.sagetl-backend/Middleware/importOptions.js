@@ -4,10 +4,7 @@ const optionsData = require("../../frontend/public/Options.json"); // Adjust the
 require("dotenv").config(); // Load environment variables from .env file
 
 // Ensure process.env.MONGO_CONN is accessible and contains the correct MongoDB URI
-const mongo_url =
-  process.env.MONGO_CONN ||
-  "mongodb+srv://Nishtha:Nishtha1@cluster0.eol8ani.mongodb.net/CRM"
-  // "mongodb+srv://bhardwajvaidehi12:uiDQ27NAyamc6dpD@cluster0.rssvri8.mongodb.net/auth-db?retryWrites=true&w=majority&appName=Cluster0";
+const mongo_url = process.env.MONGO_CONN || process.env.DATABASE_URL;
 
 mongoose
   .connect(mongo_url)
