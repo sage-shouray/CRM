@@ -14,7 +14,10 @@ import {
   faSpinner,
   faBuilding,
   faPhone,
-  faClock
+  faClock,
+  faShieldHalved,
+  faUserGear,
+  faUserCheck
 } from "@fortawesome/free-solid-svg-icons";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -33,7 +36,6 @@ function Home() {
 
   const [userRole, setUserRole] = useState("");
   const [userName, setUserName] = useState("");
-  const [userId, setUserId] = useState("");
 
   const [leads, setLeads] = useState([]);
   const [toDoTasks, setToDoTasks] = useState([]);
@@ -47,11 +49,9 @@ function Home() {
   useEffect(() => {
     const role = localStorage.getItem("userRole") || "subuser";
     const name = localStorage.getItem("loggedInUser") || "User";
-    const id = localStorage.getItem("userId") || "";
 
     setUserRole(role);
     setUserName(name);
-    setUserId(id);
 
     fetchDashboardLeads();
   }, []);
@@ -73,7 +73,13 @@ function Home() {
     }
   };
 
-  // Dynamic portal title text based on user role / credentials
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
+
   const getPortalTitle = () => {
     const r = (userRole || "").toLowerCase();
     if (r === "admin") return "ADMINISTRATOR PORTAL";
@@ -122,7 +128,7 @@ function Home() {
 
   const todayStr = getTodayStr();
   const followupsToday = calendarEvents.filter(e => e.date === todayStr && e.type === 'followup');
-  const tasksToday = toDoTasks.filter(t => t.dueDate === todayStr && !t.completed);
+  const tasksToday = toDoTasks.filter(t => (t.dueDate === todayStr || t.status === "pending") && t.status !== "done");
 
   const agendaEventsForSelectedDate = calendarEvents.filter(e => e.date === selectedDate);
   const selectedDateFollowups = agendaEventsForSelectedDate.filter(e => e.type === 'followup');
@@ -141,46 +147,81 @@ function Home() {
 
   return (
     <div className="home-dashboard-container compact-dashboard">
-      {/* Top Banner: Greeting + Dynamic Role Badge + Quick Counters + Action Buttons */}
-      <div className="compact-top-banner">
-        <div className="banner-left-info">
-          <span className="dynamic-role-badge">{getPortalTitle()}</span>
-          <h1>Welcome, {userName}!</h1>
+      {/* Clean Humanized Page Header */}
+      <div className="dashboard-page-header">
+        <div className="header-text-block">
+          <div className="header-subtitle-row">
+            <span className="role-badge-text">{getPortalTitle()}</span>
+            <span className="bullet-dot">•</span>
+            <span className="greeting-subtext">{getGreeting()}</span>
+          </div>
+          <h1 className="dashboard-welcome-heading">Welcome back, {userName}</h1>
+          <p className="dashboard-description-text">Here is your real-time sales pipeline and agenda overview.</p>
         </div>
 
-        <div className="banner-center-kpis">
-          <div className="kpi-mini-pill kpi-mini-orange" title="Follow-ups scheduled today">
-            <FontAwesomeIcon icon={faBell} />
-            <span>Follow-ups: <strong>{followupsToday.length}</strong></span>
-          </div>
-          <div className="kpi-mini-pill kpi-mini-blue" title="Tasks due today">
-            <FontAwesomeIcon icon={faTasks} />
-            <span>Tasks Due: <strong>{tasksToday.length}</strong></span>
-          </div>
-          <div className="kpi-mini-pill kpi-mini-emerald" title="Total active assigned leads">
-            <FontAwesomeIcon icon={faChartLine} />
-            <span>Active Leads: <strong>{leads.length}</strong></span>
-          </div>
-        </div>
-
-        <div className="banner-right-actions">
-          <button onClick={() => navigate("/create-lead")} className="btn-compact-action primary">
-            <FontAwesomeIcon icon={faPlus} /> Create Lead
+        <div className="header-action-group">
+          <button onClick={() => navigate("/create-lead")} className="btn-header-action btn-primary-action">
+            <FontAwesomeIcon icon={faPlus} />
+            <span>Create Lead</span>
           </button>
-          <button onClick={() => navigate("/leads")} className="btn-compact-action secondary">
-            <FontAwesomeIcon icon={faList} /> Directory
+          <button onClick={() => navigate("/leads")} className="btn-header-action btn-secondary-action">
+            <FontAwesomeIcon icon={faList} />
+            <span>Lead Directory</span>
           </button>
           {(userRole === "admin" || userRole === "supervisor") && (
-            <button onClick={() => navigate("/unassigned-leads")} className="btn-compact-action accent">
-              <FontAwesomeIcon icon={faLayerGroup} /> Unassigned
+            <button onClick={() => navigate("/unassigned-leads")} className="btn-header-action btn-secondary-action">
+              <FontAwesomeIcon icon={faLayerGroup} />
+              <span>Unassigned</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Single-Screen 3-Column Grid: Calendar | Today's Agenda | To-Do List */}
+      {/* Modern Clean Stat Cards Row */}
+      <div className="dashboard-metrics-row">
+        <div className="stat-card">
+          <div className="stat-card-header">
+            <span className="stat-card-title">Follow-ups Today</span>
+            <div className="stat-icon-wrapper icon-orange">
+              <FontAwesomeIcon icon={faBell} />
+            </div>
+          </div>
+          <div className="stat-card-body">
+            <span className="stat-number">{followupsToday.length}</span>
+            <span className="stat-subtext">scheduled for {selectedDate === todayStr ? "today" : selectedDate}</span>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-card-header">
+            <span className="stat-card-title">Pending Tasks</span>
+            <div className="stat-icon-wrapper icon-blue">
+              <FontAwesomeIcon icon={faTasks} />
+            </div>
+          </div>
+          <div className="stat-card-body">
+            <span className="stat-number">{tasksToday.length}</span>
+            <span className="stat-subtext">requiring action</span>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-card-header">
+            <span className="stat-card-title">Active Pipeline Leads</span>
+            <div className="stat-icon-wrapper icon-emerald">
+              <FontAwesomeIcon icon={faChartLine} />
+            </div>
+          </div>
+          <div className="stat-card-body">
+            <span className="stat-number">{leads.length}</span>
+            <span className="stat-subtext">total visible leads</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3-Column Responsive Grid Layout */}
       <div className="dashboard-three-column-grid">
-        {/* Column 1: Compact Interactive Calendar */}
+        {/* Column 1: Interactive Calendar */}
         <div className="grid-col col-calendar">
           <HomeCalendar
             events={calendarEvents}
@@ -189,7 +230,7 @@ function Home() {
           />
         </div>
 
-        {/* Column 2: Today's Agenda & Lead Reminders Panel */}
+        {/* Column 2: Schedule Agenda & Reminders Panel */}
         <div className="grid-col col-agenda">
           <div className="agenda-card">
             <div className="agenda-header">
@@ -197,15 +238,16 @@ function Home() {
                 <FontAwesomeIcon icon={faBell} className="agenda-header-icon" />
                 <div>
                   <h3>Schedule Agenda</h3>
-                  <p>{selectedDate === todayStr ? "Today" : selectedDate} • {agendaEventsForSelectedDate.length} item(s)</p>
+                  <p>{selectedDate === todayStr ? "Today's Schedule" : selectedDate} • {agendaEventsForSelectedDate.length} item(s)</p>
                 </div>
               </div>
               {selectedDate !== todayStr && (
                 <button
                   onClick={() => setSelectedDate(todayStr)}
                   className="btn-back-today"
+                  title="Jump to Today's Agenda"
                 >
-                  Today
+                  Return Today
                 </button>
               )}
             </div>
@@ -214,7 +256,7 @@ function Home() {
               <div className="reminder-alert-banner">
                 <FontAwesomeIcon icon={faExclamationTriangle} className="alert-icon" />
                 <span>
-                  <strong>{followupsToday.length} lead follow-up(s)</strong> due today!
+                  <strong>{followupsToday.length} lead follow-up(s)</strong> require action today!
                 </span>
               </div>
             )}
@@ -222,14 +264,14 @@ function Home() {
             <div className="agenda-items-container">
               {isLoadingLeads ? (
                 <div className="agenda-loading">
-                  <FontAwesomeIcon icon={faSpinner} spin />
-                  <span>Loading schedule...</span>
+                  <FontAwesomeIcon icon={faSpinner} spin className="spinner-icon" />
+                  <span>Fetching schedule items...</span>
                 </div>
               ) : agendaEventsForSelectedDate.length === 0 ? (
                 <div className="agenda-empty-state">
                   <FontAwesomeIcon icon={faCalendarCheck} className="empty-cal-icon" />
-                  <h4>No follow-ups for {selectedDate}</h4>
-                  <p>Select another date on the calendar or add a new task.</p>
+                  <h4>No follow-ups scheduled</h4>
+                  <p>No lead follow-ups or work tasks on {selectedDate}. Pick another date on the calendar.</p>
                 </div>
               ) : (
                 <div className="agenda-scroll-list">
@@ -244,7 +286,7 @@ function Home() {
                             <div className="lead-name-row">
                               <FontAwesomeIcon icon={faBuilding} className="building-icon" />
                               <span className="lead-company-name">{item.companyName}</span>
-                              <span className={`priority-badge prio-${item.priority.toLowerCase()}`}>
+                              <span className={`priority-badge prio-${(item.priority || 'medium').toLowerCase()}`}>
                                 {item.priority}
                               </span>
                             </div>
@@ -258,7 +300,7 @@ function Home() {
                           <button
                             onClick={() => handleOpenLead(item.leadNumber)}
                             className="btn-view-lead"
-                            title="View Lead Details"
+                            title="View Full Lead Profile"
                           >
                             <span>Details</span>
                             <FontAwesomeIcon icon={faArrowRight} />
@@ -278,7 +320,7 @@ function Home() {
                           <div className="item-main-details">
                             <span className="task-item-title">{task.title}</span>
                             <div className="lead-sub-info">
-                              <span className={`priority-badge prio-${task.priority.toLowerCase()}`}>
+                              <span className={`priority-badge prio-${(task.priority || 'medium').toLowerCase()}`}>
                                 {task.priority} Priority
                               </span>
                             </div>
@@ -299,7 +341,7 @@ function Home() {
         </div>
       </div>
 
-      {/* Lead Details Modal Drawer */}
+      {/* Lead Details Drawer Window */}
       {selectedLeadNumber && (
         <LeadDetails
           leadNumber={selectedLeadNumber}

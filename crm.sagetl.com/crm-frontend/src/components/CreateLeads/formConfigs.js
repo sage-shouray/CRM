@@ -1,99 +1,67 @@
 export const companyFormConfig = [
   [
     {
-      name: "leadType", // Changed from "Lead Type" to "leadType"
-      label: "Lead Type",
-      type: "select",
-      options: "leadTypeOptions",
-    },
-    { name: "genericEmail1", label: "Generic email 1", type: "email" }, // Changed from "Generic email 1" to "genericEmail1"
-    {
-      name: "vertical", // Changed from "Vertical" to "vertical"
-      label: "Vertical",
-      type: "select",
-      options: "verticalOptions",
+      name: "companyName",
+      label: "Company Name",
+      type: "text",
+      required: true,
+      isPrimary: true,
     },
   ],
   [
     {
-      name: "companyName", // Changed from "Company Name" to "companyName"
-      label: "Company Name",
-      type: "text",
+      name: "leadType",
+      label: "Lead Type",
+      type: "select",
+      options: "leadTypeOptions",
+      required: true,
     },
-    { name: "genericEmail2", label: "Generic email 2", type: "email" }, // Changed from "Generic email 2" to "genericEmail2"
     {
-      name: "leadAssignedTo", // Changed from "Lead Assigned to" to "leadAssignedTo"
+      name: "vertical",
+      label: "Vertical",
+      type: "select",
+      options: "verticalOptions",
+      required: true,
+    },
+    {
+      name: "leadAssignedTo",
       label: "Lead Assigned to",
       type: "select",
       options: "leadAssignedToOptions",
     },
   ],
   [
-    { name: "website", label: "Website", type: "url" }, // Changed from "Website" to "website"
-    { name: "genericPhone1", label: "Generic phone 1", type: "tel" }, // Changed from "Generic phone 1" to "genericPhone1"
-    { name: "bdm", label: "BDM", type: "select", options: "bdmOptions" }, // Changed from "BDM" to "bdm"
-  ],
-  [
-    { name: "address", label: "Address", type: "text" }, // Changed from "Address" to "address"
-    { name: "genericPhone2", label: "Generic phone 2", type: "tel" }, // Changed from "Generic phone 2" to "genericPhone2"
+    { name: "bdm", label: "BDM", type: "select", options: "bdmOptions" },
     {
-      name: "leadStatus", // Changed from "Lead Status" to "leadStatus"
+      name: "leadStatus",
       label: "Lead Status",
       type: "select",
       options: "leadStatusOptions",
     },
-  ],
-  [
-    { name: "city", label: "City", type: "text" }, // Changed from "City" to "city"
     {
-      name: "leadSource", // Changed from "Lead Source" to "leadSource"
+      name: "leadSource",
       label: "Lead Source",
       type: "select",
       options: "leadSourceOptions",
     },
+  ],
+  [
     {
-      name: "priority", // Changed from "Priority" to "priority"
+      name: "priority",
       label: "Priority",
       type: "select",
       options: "priorityOptions",
-    },
-  ],
-  [
-    {
-      name: "state", // Changed from "State" to "state"
-      label: "State",
-      type: "select",
-      options: "stateOptions",
+      required: true,
     },
     {
-      name: "totalNoOfOffices", // Remains unchanged
-      label: "Total no. of offices",
-      type: "number",
-    },
-    {
-      name: "nextAction", // Changed from "Next Action" to "nextAction"
+      name: "nextAction",
       label: "Next Action",
       type: "select",
       options: "nextActionOptions",
-
       datePicker: { name: "dateField", label: "Date" },
     },
-  ],
-  [
     {
-      name: "country", // Changed from "Country" to "country"
-      label: "Country",
-      type: "select",
-      options: "countryOptions",
-    },
-    {
-      name: "turnOverINR", // Changed from "Turn Over (INR)" to "turnOverINR"
-      label: "Turn Over (INR)",
-      type: "select",
-      options: "turnOverOptions",
-    },
-    {
-      name: "leadUsable", // Changed from "Lead Usable" to "leadUsable"
+      name: "leadUsable",
       label: "Lead Usable",
       type: "select",
       options: "leadUsableOptions",
@@ -101,24 +69,33 @@ export const companyFormConfig = [
   ],
   [
     {
-      name: "employeeCount", // Changed from "Employee Count" to "employeeCount"
-      label: "Employee Count",
-      type: "select",
-      options: "employeeCountOptions",
-    },
-    {
-      name: "totalNoOfManufUnits", // Remains unchanged
-      label: "Total no. of Manuf. Units",
-      type: "number",
-    },
-    {
-      name: "reason", // Changed from "Reason" to "reason"
+      name: "reason",
       label: "Reason",
       type: "select",
       options: "reasonOptions",
     },
+    { name: "address", label: "Address", type: "text" },
   ],
-  [{ name: "aboutTheCompany", label: "About The Company", type: "textarea" }], // Changed from "About The Company" to "aboutTheCompany"
+  [
+    {
+      name: "country",
+      label: "Country",
+      type: "select",
+      isCascadingCountry: true,
+    },
+    {
+      name: "state",
+      label: "State",
+      type: "select",
+      isCascadingState: true,
+    },
+    {
+      name: "city",
+      label: "City",
+      type: "select",
+      isCascadingCity: true,
+    },
+  ],
 ];
 
 export const contactFormConfig = [
@@ -126,9 +103,9 @@ export const contactFormConfig = [
     role: "IT",
     fields: [
       { name: "itName", label: "Name", type: "text" },
-      { name: "itDlExt", label: "DL/Ext", type: "text" },
+      { name: "itDlExt", label: "Mobile No. 1", type: "tel" },
       { name: "itDesignation", label: "Designation", type: "text" },
-      { name: "itMobile", label: "Mobile", type: "tel" },
+      { name: "itMobile", label: "Mobile No. 2", type: "tel" },
       { name: "itEmail", label: "Email", type: "email" },
       { name: "itPersonalEmail", label: "Personal Email", type: "email" },
     ],
@@ -137,9 +114,9 @@ export const contactFormConfig = [
     role: "Finance",
     fields: [
       { name: "financeName", label: "Name", type: "text" },
-      { name: "financeDlExt", label: "DL/Ext", type: "text" },
+      { name: "financeDlExt", label: "Mobile No. 1", type: "tel" },
       { name: "financeDesignation", label: "Designation", type: "text" },
-      { name: "financeMobile", label: "Mobile", type: "tel" },
+      { name: "financeMobile", label: "Mobile No. 2", type: "tel" },
       { name: "financeEmail", label: "Email", type: "email" },
       { name: "financePersonalEmail", label: "Personal Email", type: "email" },
     ],
@@ -148,9 +125,9 @@ export const contactFormConfig = [
     role: "Business Head",
     fields: [
       { name: "businessHeadName", label: "Name", type: "text" },
-      { name: "businessHeadDlExt", label: "DL/Ext", type: "text" },
+      { name: "businessHeadDlExt", label: "Mobile No. 1", type: "tel" },
       { name: "businessHeadDesignation", label: "Designation", type: "text" },
-      { name: "businessHeadMobile", label: "Mobile", type: "tel" },
+      { name: "businessHeadMobile", label: "Mobile No. 2", type: "tel" },
       {
         name: "businessHeadEmail",
         label: "Email",

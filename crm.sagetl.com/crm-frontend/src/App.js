@@ -22,6 +22,7 @@ import TeamOverview from "./components/Team/TeamOverview";
 import UserLeads from "./components/Team/UserLeads";
 import UnassignedLeads from "./components/Supervisor/UnassignedLeads";
 import MultipleAssign from "./components/Supervisor/MultipleAssign";
+import Chat from "./components/Chat/Chat";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -221,6 +222,15 @@ function App() {
               />
             }
           /> 
+          <Route
+            path="/chat"
+            element={
+              <PrivateRoute
+                element={<Chat />}
+                allowedRoles={["subuser", "supervisor", "admin"]}
+              />
+            }
+          />
           <Route
             path="/profile"
             element={

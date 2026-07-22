@@ -5,7 +5,7 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/crm';
-let pool;
+const pool = new Pool({ connectionString });
 
 // Helper to convert MongoDB-style queries to PostgreSQL WHERE clauses
 function buildWhereClause(query, startParamIndex = 1) {
@@ -56,6 +56,7 @@ function buildWhereClause(query, startParamIndex = 1) {
       if (col === 'firstName') col = 'first_name';
       else if (col === 'lastName') col = 'last_name';
       else if (col === 'supervisor') col = 'supervisor_id';
+      else if (col === 'createdBy') col = 'created_by';
     }
 
     if (value === null || value === undefined) {
@@ -152,11 +153,11 @@ function mapLead(row) {
 // Map CamelCase Lead object to database columns
 function mapLeadToDb(data) {
   const fields = {};
-  if (data.createdBy !== undefined) fields.created_by = data.createdBy;
-  if (data.companyInfo !== undefined) fields.company_info = data.companyInfo;
-  if (data.contactInfo !== undefined) fields.contact_info = data.contactInfo;
-  if (data.itLandscape !== undefined) fields.it_landscape = data.itLandscape;
-  if (data.descriptions !== undefined) fields.descriptions = data.descriptions;
+  if (data.createdBy !== undefined) fields.created_by = data.createdBy === '' || data.createdBy === null ? null : Number(data.createdBy);
+  if (data.companyInfo !== undefined) fields.company_info = typeof data.companyInfo === 'string' ? data.companyInfo : JSON.stringify(data.companyInfo);
+  if (data.contactInfo !== undefined) fields.contact_info = typeof data.contactInfo === 'string' ? data.contactInfo : JSON.stringify(data.contactInfo);
+  if (data.itLandscape !== undefined) fields.it_landscape = typeof data.itLandscape === 'string' ? data.itLandscape : JSON.stringify(data.itLandscape);
+  if (data.descriptions !== undefined) fields.descriptions = typeof data.descriptions === 'string' ? data.descriptions : JSON.stringify(data.descriptions);
   return fields;
 }
 
@@ -566,8 +567,6 @@ async function initializeDB() {
     await setupPool.end();
   }
 
-  pool = new Pool({ connectionString });
-  
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -607,6 +606,30 @@ async function initializeDB() {
       );
     `);
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chat_groups (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        created_by INT REFERENCES users(id) ON DELETE CASCADE,
+        members JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        sender_id INT REFERENCES users(id) ON DELETE CASCADE,
+        recipient_id INT REFERENCES users(id) ON DELETE SET NULL,
+        group_id INT REFERENCES chat_groups(id) ON DELETE CASCADE,
+        is_global BOOLEAN DEFAULT FALSE,
+        content TEXT NOT NULL,
+        read_by JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log("PostgreSQL schema initialized successfully.");
 
     const usersCount = await pool.query('SELECT COUNT(*) FROM users');
@@ -621,7 +644,7 @@ async function initializeDB() {
         const nameParts = u.name.split(' ');
         const firstName = nameParts[0];
         const lastName = nameParts.slice(1).join(' ') || 'User';
-        const designation = u.role === 'admin' ? 'Admin' : (u.role === 'supervisor' ? 'Supervisor' : 'Subuser');
+        const designation = u.role === 'admin' ? 'Super Admin' : (u.role === 'supervisor' ? 'Supervisor' : 'Subuser');
         const mobile = '1234567890';
         
         const insertRes = await pool.query(`
@@ -643,6 +666,23 @@ async function initializeDB() {
         }
       }
       console.log("User seeding complete.");
+    }
+
+    // Ensure Super Admin admin@sagetl.com exists with requested password Admin@1234
+    const adminCheck = await pool.query('SELECT * FROM users WHERE email = $1', ['admin@sagetl.com']);
+    const salt = await bcrypt.genSalt(10);
+    const hashedAdminPassword = await bcrypt.hash('Admin@1234', salt);
+    if (adminCheck.rowCount === 0) {
+      await pool.query(`
+        INSERT INTO users (first_name, last_name, designation, email, mobile, password, role, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, ['Admin', 'Super Admin', 'Super Admin', 'admin@sagetl.com', '9999999999', hashedAdminPassword, 'admin', 'active']);
+      console.log("Super Admin user 'admin@sagetl.com' created successfully.");
+    } else {
+      await pool.query(`
+        UPDATE users SET password = $1, role = 'admin', status = 'active' WHERE email = $2
+      `, [hashedAdminPassword, 'admin@sagetl.com']);
+      console.log("Super Admin user 'admin@sagetl.com' password & role updated successfully.");
     }
 
     const optionsCount = await pool.query('SELECT COUNT(*) FROM options');
@@ -682,6 +722,16 @@ async function initializeDB() {
 
 initializeDB();
 
+function UserConstructor(data) {
+  return new UserModelInstance(data);
+}
+Object.assign(UserConstructor, User);
+
+function LeadConstructor(data) {
+  return new LeadModelInstance(data);
+}
+Object.assign(LeadConstructor, Lead);
+
 module.exports = {
   connect: async () => {},
   connection: {
@@ -695,8 +745,9 @@ module.exports = {
   isValidObjectId: function(id) {
     return typeof id === 'number' || (typeof id === 'string' && id.length > 0 && !isNaN(Number(id)));
   },
-  User,
-  Lead,
+  User: UserConstructor,
+  Lead: LeadConstructor,
   OptionsModel,
-  pool
+  pool,
+  query: (text, params) => pool.query(text, params)
 };

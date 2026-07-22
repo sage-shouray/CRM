@@ -102,72 +102,72 @@ app.post("/api/leads", upload.single("file"), async (req, res) => {
 
     const leadData = {
       companyInfo: {
-        leadType: parsedData.company.leadType,
-        genericEmail1: parsedData.company.genericEmail1,
-        vertical: parsedData.company.vertical,
-        companyName: parsedData.company.companyName,
-        genericEmail2: parsedData.company.genericEmail2,
-        leadAssignedTo: parsedData.company.leadAssignedTo,
-        website: parsedData.company.website,
-        genericPhone1: parsedData.company.genericPhone1,
-        bdm: parsedData.company.bdm,
-        address: parsedData.company.address,
-        genericPhone2: parsedData.company.genericPhone2,
-        leadStatus: parsedData.company.leadStatus,
-        city: parsedData.company.city,
-        leadSource: parsedData.company.leadSource,
-        priority: parsedData.company.priority,
-        state: parsedData.company.state,
-        totalNoOfOffices: Number(parsedData.company.totalNoOfOffices),
-        nextAction: parsedData.company.nextAction,
-        country: parsedData.company.country,
-        turnOverINR: parsedData.company.turnOverINR,
-        leadUsable: parsedData.company.leadUsable,
-        employeeCount: parsedData.company.employeeCount,
-        totalNoOfManufUnits: Number(parsedData.company.totalNoOfManufUnits),
-        reason: parsedData.company.reason,
-        aboutTheCompany: parsedData.company.aboutTheCompany,
-        dateField: parsedData.company.dateField,
+        leadType: parsedData.company?.leadType,
+        genericEmail1: parsedData.company?.genericEmail1,
+        vertical: parsedData.company?.vertical,
+        companyName: parsedData.company?.companyName,
+        genericEmail2: parsedData.company?.genericEmail2,
+        leadAssignedTo: parsedData.company?.leadAssignedTo ? Number(parsedData.company.leadAssignedTo) : null,
+        website: parsedData.company?.website,
+        genericPhone1: parsedData.company?.genericPhone1,
+        bdm: parsedData.company?.bdm,
+        address: parsedData.company?.address,
+        genericPhone2: parsedData.company?.genericPhone2,
+        leadStatus: parsedData.company?.leadStatus,
+        city: parsedData.company?.city,
+        leadSource: parsedData.company?.leadSource,
+        priority: parsedData.company?.priority,
+        state: parsedData.company?.state,
+        totalNoOfOffices: parsedData.company?.totalNoOfOffices ? Number(parsedData.company.totalNoOfOffices) : 0,
+        nextAction: parsedData.company?.nextAction,
+        country: parsedData.company?.country,
+        turnOverINR: parsedData.company?.turnOverINR,
+        leadUsable: parsedData.company?.leadUsable,
+        employeeCount: parsedData.company?.employeeCount,
+        totalNoOfManufUnits: parsedData.company?.totalNoOfManufUnits ? Number(parsedData.company.totalNoOfManufUnits) : 0,
+        reason: parsedData.company?.reason,
+        aboutTheCompany: parsedData.company?.aboutTheCompany,
+        dateField: parsedData.company?.dateField,
       },
       contactInfo: {
         it: {
-          name: parsedData.contact.itName,
-          dlExt: parsedData.contact.itDlExt,
-          designation: parsedData.contact.itDesignation,
-          mobile: parsedData.contact.itMobile,
-          email: parsedData.contact.itEmail,
-          personalEmail: parsedData.contact.itPersonalEmail,
+          name: parsedData.contact?.itName,
+          dlExt: parsedData.contact?.itDlExt,
+          designation: parsedData.contact?.itDesignation,
+          mobile: parsedData.contact?.itMobile,
+          email: parsedData.contact?.itEmail,
+          personalEmail: parsedData.contact?.itPersonalEmail,
         },
         finance: {
-          name: parsedData.contact.financeName,
-          dlExt: parsedData.contact.financeDlExt,
-          designation: parsedData.contact.financeDesignation,
-          mobile: parsedData.contact.financeMobile,
-          email: parsedData.contact.financeEmail,
-          personalEmail: parsedData.contact.financePersonalEmail,
+          name: parsedData.contact?.financeName,
+          dlExt: parsedData.contact?.financeDlExt,
+          designation: parsedData.contact?.financeDesignation,
+          mobile: parsedData.contact?.financeMobile,
+          email: parsedData.contact?.financeEmail,
+          personalEmail: parsedData.contact?.financePersonalEmail,
         },
         businessHead: {
-          name: parsedData.contact.businessHeadName,
-          dlExt: parsedData.contact.businessHeadDlExt,
-          designation: parsedData.contact.businessHeadDesignation,
-          mobile: parsedData.contact.businessHeadMobile,
-          email: parsedData.contact.businessHeadEmail,
-          personalEmail: parsedData.contact.businessHeadPersonalEmail,
+          name: parsedData.contact?.businessHeadName,
+          dlExt: parsedData.contact?.businessHeadDlExt,
+          designation: parsedData.contact?.businessHeadDesignation,
+          mobile: parsedData.contact?.businessHeadMobile,
+          email: parsedData.contact?.businessHeadEmail,
+          personalEmail: parsedData.contact?.businessHeadPersonalEmail,
         },
       },
       itLandscape: {
-        netNew: parsedData.itLandscape.netNew,
-        SAPInstalledBase: parsedData.itLandscape.SAPInstalledBase,
+        netNew: parsedData.itLandscape?.netNew || {},
+        SAPInstalledBase: parsedData.itLandscape?.SAPInstalledBase || {},
       },
       descriptions: [
         {
           description: parsedData.description,
           selectedOption: parsedData.selectedOption,
           radioValue: parsedData.radioValue,
-          addedBy: new mongoose.Types.ObjectId(parsedData.createdBy),
+          addedBy: parsedData.createdBy ? Number(parsedData.createdBy) : null,
         },
       ],
-      createdBy: new mongoose.Types.ObjectId(parsedData.createdBy),
+      createdBy: parsedData.createdBy ? Number(parsedData.createdBy) : null,
     };
 
     if (req.file) {
@@ -197,32 +197,26 @@ app.post("/api/leads", upload.single("file"), async (req, res) => {
 });
 
 
-// Helper function to safely convert string to ObjectId
-const safeObjectId = (id) => {
-  try {
-    return mongoose.Types.ObjectId(id);
-  } catch (error) {
-    console.warn(`Invalid ObjectId: ${id}`);
-    return id; // Return the original string if conversion fails
-  }
-};
 app.get("/api/assigned-leads", authenticateToken, async (req, res) => {
-   console.log("Route hit: /api/assigned-leads");
   try {
-    const userId = req.user._id; // The logged-in user's ID
-console.log("User ID:", userId);
-    // Query to fetch leads assigned to the logged-in user
+    const rawUserId = req.user?._id || req.user?.id;
+    const userId = Number(rawUserId);
+    const userIdStr = String(userId);
+
     const leads = await Lead.find({
-      "companyInfo.leadAssignedTo": userId,
+      $or: [
+        { "companyInfo.leadAssignedTo": userIdStr },
+        { "companyInfo.leadAssignedTo": userId }
+      ]
     })
-      .populate("companyInfo.leadAssignedTo", "firstName lastName") // Optional, if you want to include assigned user's name
-      .populate("createdBy", "firstName lastName") // Optional, for creator details
+      .populate("companyInfo.leadAssignedTo", "firstName lastName")
+      .populate("createdBy", "firstName lastName")
       .sort({ createdAt: -1 });
-console.log("Leads fetched:", leads);
+
     if (!leads || leads.length === 0) {
       return res
         .status(200)
-        .json({ message: "No leads assigned to you.", leads: [] });
+        .json([]);
     }
 
     res.json(leads);
@@ -242,47 +236,46 @@ app.get(
   checkRole(["subuser", "supervisor", "admin"]),
   async (req, res) => {
     try {
-      const userId = req.user?._id; // The user ID from the authenticated user
-      const userRole = req.user?.role; // The role of the authenticated user
+      const rawUserId = req.user?._id || req.user?.id;
+      const userRole = (req.user?.role || "").toLowerCase();
 
-      // Check if userId and userRole are valid
-      if (!userId || !userRole) {
+      if (!rawUserId || !userRole) {
         return res.status(400).json({ error: "Invalid user data" });
       }
 
-      // Initialize the query object based on role-based filtering
+      const userId = Number(rawUserId);
       let query = {};
 
       if (userRole === "admin") {
-        // Admin can see all leads, no need to modify the query
-      } else {
-        let userIds = [new mongoose.Types.ObjectId(userId)]; // Include current user
+        // Super Admin has full company-wide access to view all leads
+        query = {};
+      } else if (userRole === "supervisor") {
+        // Supervisor sees their own leads + all leads of subusers assigned to them
+        const subusers = await User.find({ supervisor: userId });
+        const subuserIds = subusers.map((user) => Number(user._id || user.id)).filter(id => !isNaN(id));
+        const allowedUserIds = [userId, ...subuserIds];
+        const allowedUserIdsStr = allowedUserIds.map(String);
 
-        if (userRole === "supervisor") {
-          // Find subusers if the user is a supervisor
-          const subusers = await User.find({
-            supervisor: userId,
-            role: "subuser",
-          }).select("_id");
-
-          if (subusers.length > 0) {
-            const subuserIds = subusers.map(
-              (user) => new mongoose.Types.ObjectId(user._id)
-            );
-            userIds = [...userIds, ...subuserIds]; // Include subuser IDs in the array
-          }
-        }
-
-        // Role-based query for created or assigned leads
         query = {
           $or: [
-            { createdBy: { $in: userIds } },
-            { "companyInfo.leadAssignedTo": { $in: userIds } },
+            { createdBy: { $in: allowedUserIds } },
+            { "companyInfo.leadAssignedTo": { $in: allowedUserIdsStr } },
+            { "companyInfo.leadAssignedTo": { $in: allowedUserIds } }
+          ],
+        };
+      } else {
+        // Subuser sees ONLY leads created by them OR assigned to them
+        const userIdStr = String(userId);
+        query = {
+          $or: [
+            { createdBy: userId },
+            { "companyInfo.leadAssignedTo": userIdStr },
+            { "companyInfo.leadAssignedTo": userId }
           ],
         };
       }
 
-      // Extract filter parameters from the request query
+      // Filter parameters from query
       const {
         companyName,
         cityName,
@@ -296,7 +289,6 @@ app.get(
         allLeads,
       } = req.query;
 
-      // Add additional filters to the query object
       if (companyName)
         query["companyInfo.companyName"] = {
           $regex: companyName,
@@ -317,23 +309,19 @@ app.get(
         query["companyInfo.turnOverINR"] = { $regex: turnOver, $options: "i" };
       if (leadType)
         query["companyInfo.leadType"] = { $regex: leadType, $options: "i" };
-      if (team) query["companyInfo.leadAssignedTo"] = team;
+      if (team) query["companyInfo.leadAssignedTo"] = String(team);
 
-      // Filter leads created or assigned based on allLeads option
       if (allLeads === "createdByMe") {
         query.createdBy = userId;
       } else if (allLeads === "assignedToMe") {
-        query["companyInfo.leadAssignedTo"] = userId;
+        query["companyInfo.leadAssignedTo"] = String(userId);
       }
 
-      // Fetch leads based on the constructed query
       const leads = await Lead.find(query)
         .populate("companyInfo.leadAssignedTo", "firstName lastName")
         .populate("createdBy", "firstName lastName")
-        .sort({ createdAt: -1 })
-        .limit(userRole === "admin" ? 0 : 10); // Limit results for non-admins
+        .sort({ createdAt: -1 });
 
-      // Return the fetched leads
       res.json(leads);
     } catch (error) {
       console.error("Error fetching leads:", error);
@@ -818,6 +806,304 @@ app.put(
 );
 
 
+
+// ==================== IN-APP CHAT & MESSAGING SYSTEM ====================
+
+// Get all users available for chat
+app.get("/api/chat/users", authenticateToken, async (req, res) => {
+  try {
+    const currentUserId = Number(req.user._id || req.user.id);
+    const users = await User.find({ status: "active" });
+    const formatted = users
+      .filter(u => Number(u.id || u._id) !== currentUserId)
+      .map(u => ({
+        id: Number(u.id || u._id),
+        name: `${u.firstName} ${u.lastName}`.trim(),
+        email: u.email,
+        role: u.role,
+        designation: u.designation
+      }));
+    res.json(formatted);
+  } catch (error) {
+    console.error("Error fetching chat users:", error);
+    res.status(500).json({ error: "Failed to fetch chat users" });
+  }
+});
+
+// Get direct messages between current user and target user
+app.get("/api/chat/messages/direct/:targetUserId", authenticateToken, async (req, res) => {
+  try {
+    const currentUserId = Number(req.user._id || req.user.id);
+    const targetUserId = Number(req.params.targetUserId);
+
+    const query = `
+      SELECT m.*, 
+        u_sender.first_name as sender_first_name, u_sender.last_name as sender_last_name,
+        u_rec.first_name as recipient_first_name, u_rec.last_name as recipient_last_name
+      FROM messages m
+      JOIN users u_sender ON m.sender_id = u_sender.id
+      LEFT JOIN users u_rec ON m.recipient_id = u_rec.id
+      WHERE (m.sender_id = $1 AND m.recipient_id = $2)
+         OR (m.sender_id = $2 AND m.recipient_id = $1)
+      ORDER BY m.created_at ASC
+    `;
+    const result = await mongoose.pool.query(query, [currentUserId, targetUserId]);
+    
+    const messages = result.rows.map(r => ({
+      id: r.id,
+      senderId: r.sender_id,
+      senderName: `${r.sender_first_name} ${r.sender_last_name}`.trim(),
+      recipientId: r.recipient_id,
+      recipientName: `${r.recipient_first_name || ''} ${r.recipient_last_name || ''}`.trim(),
+      content: r.content,
+      createdAt: r.created_at
+    }));
+
+    res.json(messages);
+  } catch (error) {
+    console.error("Error fetching direct messages:", error);
+    res.status(500).json({ error: "Failed to fetch direct messages" });
+  }
+});
+
+// Send a direct message
+app.post("/api/chat/messages/direct", authenticateToken, async (req, res) => {
+  try {
+    const senderId = Number(req.user._id || req.user.id);
+    const { recipientId, content } = req.body;
+
+    if (!recipientId || !content || !content.trim()) {
+      return res.status(400).json({ error: "Recipient and content are required" });
+    }
+
+    const insertQuery = `
+      INSERT INTO messages (sender_id, recipient_id, content, read_by)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `;
+    const result = await mongoose.pool.query(insertQuery, [senderId, Number(recipientId), content.trim(), JSON.stringify([senderId])]);
+    
+    const sender = await User.findById(senderId);
+    const newMsg = {
+      id: result.rows[0].id,
+      senderId: senderId,
+      senderName: sender ? `${sender.firstName} ${sender.lastName}` : "User",
+      recipientId: Number(recipientId),
+      content: result.rows[0].content,
+      createdAt: result.rows[0].created_at
+    };
+
+    res.status(201).json(newMsg);
+  } catch (error) {
+    console.error("Error sending direct message:", error);
+    res.status(500).json({ error: "Failed to send direct message" });
+  }
+});
+
+// Get user's chat groups
+app.get("/api/chat/groups", authenticateToken, async (req, res) => {
+  try {
+    const currentUserId = Number(req.user._id || req.user.id);
+
+    const query = `
+      SELECT g.*, u.first_name as creator_first_name, u.last_name as creator_last_name
+      FROM chat_groups g
+      JOIN users u ON g.created_by = u.id
+      ORDER BY g.created_at DESC
+    `;
+    const result = await mongoose.pool.query(query);
+
+    const userGroups = result.rows.filter(g => {
+      const members = Array.isArray(g.members) ? g.members : (typeof g.members === 'string' ? JSON.parse(g.members) : []);
+      return g.created_by === currentUserId || members.map(Number).includes(currentUserId);
+    }).map(g => ({
+      id: g.id,
+      name: g.name,
+      description: g.description,
+      createdBy: g.created_by,
+      creatorName: `${g.creator_first_name} ${g.creator_last_name}`.trim(),
+      members: Array.isArray(g.members) ? g.members : (typeof g.members === 'string' ? JSON.parse(g.members) : []),
+      createdAt: g.created_at
+    }));
+
+    res.json(userGroups);
+  } catch (error) {
+    console.error("Error fetching chat groups:", error);
+    res.status(500).json({ error: "Failed to fetch chat groups" });
+  }
+});
+
+// Create a new chat group
+app.post("/api/chat/groups", authenticateToken, async (req, res) => {
+  try {
+    const creatorId = Number(req.user._id || req.user.id);
+    const { name, description, memberIds } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: "Group name is required" });
+    }
+
+    const uniqueMembers = [...new Set([creatorId, ...(memberIds || []).map(Number)])];
+
+    const insertQuery = `
+      INSERT INTO chat_groups (name, description, created_by, members)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `;
+    const result = await mongoose.pool.query(insertQuery, [
+      name.trim(),
+      description ? description.trim() : "",
+      creatorId,
+      JSON.stringify(uniqueMembers)
+    ]);
+
+    const creator = await User.findById(creatorId);
+    const newGroup = {
+      id: result.rows[0].id,
+      name: result.rows[0].name,
+      description: result.rows[0].description,
+      createdBy: creatorId,
+      creatorName: creator ? `${creator.firstName} ${creator.lastName}` : "User",
+      members: uniqueMembers,
+      createdAt: result.rows[0].created_at
+    };
+
+    res.status(201).json(newGroup);
+  } catch (error) {
+    console.error("Error creating chat group:", error);
+    res.status(500).json({ error: "Failed to create chat group" });
+  }
+});
+
+// Get group messages
+app.get("/api/chat/messages/group/:groupId", authenticateToken, async (req, res) => {
+  try {
+    const groupId = Number(req.params.groupId);
+
+    const query = `
+      SELECT m.*, u.first_name as sender_first_name, u.last_name as sender_last_name, u.role as sender_role
+      FROM messages m
+      JOIN users u ON m.sender_id = u.id
+      WHERE m.group_id = $1
+      ORDER BY m.created_at ASC
+    `;
+    const result = await mongoose.pool.query(query, [groupId]);
+
+    const messages = result.rows.map(r => ({
+      id: r.id,
+      senderId: r.sender_id,
+      senderName: `${r.sender_first_name} ${r.sender_last_name}`.trim(),
+      senderRole: r.sender_role,
+      groupId: r.group_id,
+      content: r.content,
+      createdAt: r.created_at
+    }));
+
+    res.json(messages);
+  } catch (error) {
+    console.error("Error fetching group messages:", error);
+    res.status(500).json({ error: "Failed to fetch group messages" });
+  }
+});
+
+// Send a group message
+app.post("/api/chat/messages/group", authenticateToken, async (req, res) => {
+  try {
+    const senderId = Number(req.user._id || req.user.id);
+    const { groupId, content } = req.body;
+
+    if (!groupId || !content || !content.trim()) {
+      return res.status(400).json({ error: "Group ID and content are required" });
+    }
+
+    const insertQuery = `
+      INSERT INTO messages (sender_id, group_id, content, read_by)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `;
+    const result = await mongoose.pool.query(insertQuery, [senderId, Number(groupId), content.trim(), JSON.stringify([senderId])]);
+
+    const sender = await User.findById(senderId);
+    const newMsg = {
+      id: result.rows[0].id,
+      senderId: senderId,
+      senderName: sender ? `${sender.firstName} ${sender.lastName}` : "User",
+      senderRole: sender ? sender.role : "subuser",
+      groupId: Number(groupId),
+      content: result.rows[0].content,
+      createdAt: result.rows[0].created_at
+    };
+
+    res.status(201).json(newMsg);
+  } catch (error) {
+    console.error("Error sending group message:", error);
+    res.status(500).json({ error: "Failed to send group message" });
+  }
+});
+
+// Get global announcement messages
+app.get("/api/chat/messages/global", authenticateToken, async (req, res) => {
+  try {
+    const query = `
+      SELECT m.*, u.first_name as sender_first_name, u.last_name as sender_last_name, u.role as sender_role
+      FROM messages m
+      JOIN users u ON m.sender_id = u.id
+      WHERE m.is_global = TRUE
+      ORDER BY m.created_at ASC
+    `;
+    const result = await mongoose.pool.query(query);
+
+    const messages = result.rows.map(r => ({
+      id: r.id,
+      senderId: r.sender_id,
+      senderName: `${r.sender_first_name} ${r.sender_last_name}`.trim(),
+      senderRole: r.sender_role,
+      isGlobal: true,
+      content: r.content,
+      createdAt: r.created_at
+    }));
+
+    res.json(messages);
+  } catch (error) {
+    console.error("Error fetching global messages:", error);
+    res.status(500).json({ error: "Failed to fetch global messages" });
+  }
+});
+
+// Broadcast global announcement (Admin only)
+app.post("/api/chat/messages/global", authenticateToken, checkRole(["admin"]), async (req, res) => {
+  try {
+    const senderId = Number(req.user._id || req.user.id);
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: "Announcement content is required" });
+    }
+
+    const insertQuery = `
+      INSERT INTO messages (sender_id, is_global, content, read_by)
+      VALUES ($1, TRUE, $2, $3)
+      RETURNING *
+    `;
+    const result = await mongoose.pool.query(insertQuery, [senderId, content.trim(), JSON.stringify([senderId])]);
+
+    const sender = await User.findById(senderId);
+    const newMsg = {
+      id: result.rows[0].id,
+      senderId: senderId,
+      senderName: sender ? `${sender.firstName} ${sender.lastName}` : "Super Admin",
+      senderRole: "admin",
+      isGlobal: true,
+      content: result.rows[0].content,
+      createdAt: result.rows[0].created_at
+    };
+
+    res.status(201).json(newMsg);
+  } catch (error) {
+    console.error("Error posting global announcement:", error);
+    res.status(500).json({ error: "Failed to post global announcement" });
+  }
+});
 
 // Start the server
 const PORT = process.env.PORT || 8080;

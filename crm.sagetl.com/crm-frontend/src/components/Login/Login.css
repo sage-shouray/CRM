@@ -2,16 +2,16 @@
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    background-color: #f1f5f9;
+    background-color: var(--slate-100);
     background-image: 
-        radial-gradient(at 100% 0%, rgba(211, 100, 11, 0.05) 0px, transparent 40%),
-        radial-gradient(at 0% 100%, rgba(30, 41, 59, 0.04) 0px, transparent 40%);
+        radial-gradient(at 100% 0%, rgba(249, 115, 22, 0.06) 0px, transparent 45%),
+        radial-gradient(at 0% 100%, rgba(15, 23, 42, 0.05) 0px, transparent 45%);
     justify-content: space-between;
 }
 
 .top-branding-bar {
-    height: 6px;
-    background: linear-gradient(90deg, #D3640B 0%, #f97316 50%, #1e293b 100%);
+    height: 5px;
+    background: linear-gradient(90deg, #f97316 0%, #ea580c 50%, #0f172a 100%);
 }
 
 .main-content {
@@ -22,12 +22,11 @@
     padding: 36px 20px;
 }
 
-/* Enlarge login container card - crisp, realistic, professional dimensions */
 .login-container {
     background: #ffffff;
-    border: 1px solid #cbd5e1;
-    border-radius: 20px;
-    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
     padding: 32px;
     width: 100%;
     max-width: 1080px;
@@ -38,13 +37,12 @@
     box-sizing: border-box;
 }
 
-/* Left Showcase Panel - Executive Dark Corporate Theme */
 .image-box {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
-    border-radius: 16px;
+    background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%);
+    border-radius: var(--radius-md);
     padding: 36px;
     position: relative;
     overflow: hidden;
@@ -58,9 +56,9 @@
 }
 
 .logo {
-    max-width: 220px;
+    max-width: 210px;
     height: auto;
-    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25));
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
 }
 
 .highlights-container {
@@ -75,13 +73,13 @@
 .headline-group h2 {
     color: #ffffff;
     font-size: 24px;
-    font-weight: 700;
+    font-weight: 800;
     margin: 0 0 10px 0;
-    letter-spacing: -0.4px;
+    letter-spacing: -0.5px;
 }
 
 .highlights-sub {
-    font-size: 14px;
+    font-size: 13.5px;
     color: #94a3b8;
     line-height: 1.55;
     margin: 0 0 28px 0;
@@ -100,7 +98,7 @@
 }
 
 .feature-icon {
-    color: #D3640B;
+    color: #fb923c;
     font-size: 18px;
     margin-top: 2px;
     flex-shrink: 0;
@@ -109,7 +107,7 @@
 .feature-item h3 {
     color: #f8fafc;
     font-size: 14.5px;
-    font-weight: 600;
+    font-weight: 700;
     margin: 0 0 4px 0;
 }
 
@@ -120,7 +118,6 @@
     margin: 0;
 }
 
-/* Authentic map watermark image background */
 .map-backdrop {
     position: absolute;
     bottom: -20px;
@@ -133,7 +130,6 @@
     filter: invert(1);
 }
 
-/* Right Sign In Form Panel */
 .box {
     display: flex;
     flex-direction: column;
@@ -144,10 +140,11 @@
 
 .form-header {
     margin-bottom: 28px;
+    text-align: left;
 }
 
 .box h1 {
-    color: #0f172a;
+    color: var(--slate-900);
     font-size: 26px;
     font-weight: 800;
     margin: 0 0 8px 0;
@@ -155,7 +152,7 @@
 }
 
 .form-subtitle {
-    color: #64748b;
+    color: var(--slate-500);
     font-size: 14px;
     margin: 0;
     line-height: 1.5;
@@ -180,8 +177,8 @@
 }
 
 label {
-    color: #334155;
-    font-weight: 600;
+    color: var(--slate-700);
+    font-weight: 700;
     font-size: 13px;
     text-align: left;
 }
@@ -195,35 +192,34 @@ label {
 .input-icon {
     position: absolute;
     left: 14px;
-    color: #94a3b8;
+    color: var(--slate-400);
     font-size: 14px;
     pointer-events: none;
-    transition: color var(--transition-fast, 0.15s ease);
+    transition: color var(--transition-fast);
 }
 
 .input-with-icon input {
     width: 100%;
     padding: 13px 40px 13px 40px;
-    border: 1.5px solid #cbd5e1;
-    border-radius: 10px;
+    border: 1.5px solid var(--slate-300);
+    border-radius: var(--radius-xs);
     font-size: 14px;
     font-family: inherit;
-    color: #0f172a;
-    background-color: #f8fafc;
+    color: var(--slate-900);
+    background-color: var(--slate-50);
     box-sizing: border-box;
-    transition: all 0.15s ease;
+    transition: all var(--transition-fast);
 }
 
 .input-with-icon input:focus {
     outline: none;
-    border-color: #D3640B;
+    border-color: var(--primary);
     background-color: #ffffff;
-    box-shadow: 0 0 0 3px rgba(211, 100, 11, 0.14);
+    box-shadow: 0 0 0 3.5px var(--primary-glow);
 }
 
-.input-with-icon input:focus + .input-icon,
 .input-with-icon input:focus ~ .input-icon {
-    color: #D3640B;
+    color: var(--primary);
 }
 
 .toggle-password-btn {
@@ -231,7 +227,7 @@ label {
     right: 12px;
     background: transparent;
     border: none;
-    color: #94a3b8;
+    color: var(--slate-400);
     cursor: pointer;
     padding: 6px;
     display: flex;
@@ -239,48 +235,47 @@ label {
     justify-content: center;
     font-size: 14px;
     border-radius: 6px;
-    transition: color 0.15s ease;
+    transition: color var(--transition-fast);
 }
 
 .toggle-password-btn:hover {
-    color: #334155;
+    color: var(--slate-700);
 }
 
 .forgot-password {
-    color: #D3640B;
+    color: var(--primary);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     text-decoration: none;
-    transition: color 0.15s ease;
+    transition: color var(--transition-fast);
 }
 
 .forgot-password:hover {
-    color: #b55409;
+    color: var(--primary-hover);
     text-decoration: underline;
 }
 
-/* Primary Corporate Submit Button */
 .btn-login {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    background: #D3640B;
+    background: var(--primary-gradient);
     color: #ffffff;
     border: none;
     padding: 14px 20px;
-    border-radius: 10px;
+    border-radius: var(--radius-xs);
     font-size: 15px;
     font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(211, 100, 11, 0.22);
-    transition: all 0.15s ease;
+    box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3);
+    transition: all var(--transition-fast);
     margin-top: 8px;
 }
 
 .btn-login:hover:not(:disabled) {
-    background: #b55409;
-    box-shadow: 0 6px 16px rgba(211, 100, 11, 0.32);
+    box-shadow: 0 6px 18px rgba(249, 115, 22, 0.42);
+    transform: translateY(-1px);
 }
 
 .btn-login:active:not(:disabled) {
@@ -300,21 +295,19 @@ label {
     font-size: 15px;
 }
 
-/* Corporate Footer */
 .footer {
     padding: 16px 20px;
-    background-color: #0f172a;
+    background-color: var(--slate-900);
     text-align: center;
-    color: #94a3b8;
+    color: var(--slate-400);
     font-size: 12px;
-    border-top: 1px solid #1e293b;
+    border-top: 1px solid var(--slate-800);
 }
 
 .footer p {
     margin: 0;
 }
 
-/* Responsive Styles */
 @media (max-width: 960px) {
     .login-container {
         max-width: 840px;
@@ -365,7 +358,7 @@ label {
 
     .login-container {
         padding: 20px;
-        border-radius: 16px;
+        border-radius: var(--radius-md);
     }
 
     .box h1 {

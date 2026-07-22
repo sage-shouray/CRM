@@ -3,10 +3,16 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { handleSuccess } from "../../utils";
 import { ToastContainer } from "react-toastify";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { 
+  faHouse, 
+  faRightFromBracket, 
+  faFileExcel,
+  faComments
+} from "@fortawesome/free-solid-svg-icons";
 import Dropdown from "./Dropdown";
 import "./Header.css";
 import logo from "./logo.png";
-import home from "./home.png";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
 
@@ -45,8 +51,8 @@ function Header() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    setLoggedInUser(localStorage.getItem("loggedInUser"));
-    setUserRole(localStorage.getItem("userRole"));
+    setLoggedInUser(localStorage.getItem("loggedInUser") || "User");
+    setUserRole(localStorage.getItem("userRole") || "subuser");
   }, []);
 
   const handleLogout = () => {
@@ -55,11 +61,11 @@ function Header() {
     localStorage.removeItem("userId");
     localStorage.removeItem("userRole");
 
-    handleSuccess("User Logged out");
+    handleSuccess("Logged out successfully");
     setTimeout(() => {
       navigate("/login", { replace: true });
       window.location.reload();
-    }, 1000);
+    }, 800);
   };
 
   const handleDocumentClick = (event) => {
@@ -102,10 +108,14 @@ function Header() {
   };
 
   const headerButtons = headerButtonsByRole[userRole] || [];
+  const userInitial = (loggedInUser.charAt(0) || "U").toUpperCase();
 
   return (
     <div className="main-container">
-      <img src={logo} alt="Top " className="top-image" />
+      <div className="brand-logo-area" onClick={() => navigate("/home")} title="Return to Dashboard">
+        <img src={logo} alt="Sage CRM Logo" className="top-image" />
+        <span className="brand-badge">CRM PORTAL</span>
+      </div>
 
       <div
         className={`main-header ${
@@ -119,6 +129,24 @@ function Header() {
         }`}
       >
         <div className="header-buttons">
+          <button 
+            onClick={() => navigate("/home")} 
+            className="btn-home-shortcut"
+            title="Dashboard Home"
+          >
+            <FontAwesomeIcon icon={faHouse} />
+            <span>Home</span>
+          </button>
+
+          <button 
+            onClick={() => navigate("/chat")} 
+            className="btn-home-shortcut btn-chat-shortcut"
+            title="In-App Chat & Messages"
+          >
+            <FontAwesomeIcon icon={faComments} />
+            <span>Chat</span>
+          </button>
+
           {headerButtons.map((button, index) => (
             <Dropdown
               key={index}
@@ -129,31 +157,38 @@ function Header() {
             />
           ))}
         </div>
+
         {userRole === "admin" && (
           <div className="admin-download-buttons">
-            <button onClick={() => downloadFile("leads")}>
-              Download Leads
+            <button onClick={() => downloadFile("leads")} title="Export all leads to Excel">
+              <FontAwesomeIcon icon={faFileExcel} className="excel-icon" />
+              <span>Leads XLSX</span>
             </button>
-            <button onClick={() => downloadFile("users")}>
-              Download Users
+            <button onClick={() => downloadFile("users")} title="Export all users to Excel">
+              <FontAwesomeIcon icon={faFileExcel} className="excel-icon" />
+              <span>Users XLSX</span>
             </button>
           </div>
         )}
-        <div className="user-info">
-          <span 
-            className="user-name" 
-            onClick={() => navigate("/profile")}
-            style={{ cursor: "pointer" }}
-            title="Click to view Profile & Change Password"
-          >
-            {loggedInUser}
-          </span>
 
-          <button onClick={handleLogout} className="logout-button">
-            Logout
-          </button>
-          <button onClick={() => navigate("/home")} className="btn">
-            <img src={home} className="interface" alt="Home" />
+        <div className="user-info">
+          <div 
+            className="user-profile-trigger" 
+            onClick={() => navigate("/profile")}
+            title="View Profile & Settings"
+          >
+            <div className="avatar-circle">
+              <span>{userInitial}</span>
+            </div>
+            <div className="user-text-details">
+              <span className="user-name">{loggedInUser}</span>
+              <span className="user-role-label">{userRole.toUpperCase()}</span>
+            </div>
+          </div>
+
+          <button onClick={handleLogout} className="logout-button" title="Sign out of CRM">
+            <FontAwesomeIcon icon={faRightFromBracket} />
+            <span>Logout</span>
           </button>
         </div>
       </div>

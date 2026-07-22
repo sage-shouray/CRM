@@ -1,11 +1,19 @@
-/* base rules handled by index.css */
+/* Base rules for CreateLeads */
+
+.create-leads-container {
+  padding: 10px 20px 40px;
+}
+
+.section-header-box {
+  margin-bottom: 24px;
+}
 
 h1 {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--slate-900);
   margin-top: 0;
-  margin-bottom: 24px;
+  margin-bottom: 6px;
   letter-spacing: -0.5px;
   text-transform: uppercase;
   position: relative;
@@ -17,30 +25,36 @@ h1::after {
   position: absolute;
   bottom: -6px;
   left: 0;
-  width: 40px;
-  height: 3px;
+  width: 44px;
+  height: 3.5px;
   background: var(--primary-gradient);
   border-radius: 2px;
 }
 
+.section-subtext {
+  font-size: 12.5px;
+  color: var(--slate-500);
+  margin: 8px 0 0 0;
+}
+
 h2 {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--slate-600);
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--slate-700);
   margin-top: 20px;
-  margin-bottom: 15px;
+  margin-bottom: 14px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-/* Form layout container cards */
+/* Form section card container */
 .form-section {
   width: 100%;
   max-width: 1200px;
   margin: 24px auto;
   padding: 30px;
   background-color: #ffffff;
-  border: 1px solid var(--slate-200);
+  border: 1px solid rgba(226, 232, 240, 0.9);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   box-sizing: border-box;
@@ -66,11 +80,45 @@ h2 {
   flex-basis: 100%;
 }
 
-/* Form elements */
+/* Primary Top Field: Company Name */
+.primary-company-field {
+  background: var(--primary-light);
+  border: 1.5px solid var(--primary-border);
+  padding: 16px 20px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+.primary-company-field label {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--primary-hover);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.primary-input {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  border-color: var(--primary-border) !important;
+  background: #ffffff !important;
+}
+
+.primary-input:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 4px var(--primary-glow) !important;
+}
+
+/* Labels & inputs */
 label {
   color: var(--slate-700);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 13px;
+}
+
+.req-star {
+  color: var(--danger);
+  font-weight: 800;
 }
 
 input,
@@ -78,8 +126,8 @@ select,
 textarea {
   width: 100%;
   padding: 10px 14px;
-  border: 1.5px solid var(--slate-200);
-  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--slate-300);
+  border-radius: var(--radius-xs);
   font-size: 13.5px;
   font-family: inherit;
   background-color: #ffffff;
@@ -92,12 +140,7 @@ select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-glow);
-}
-
-input,
-select {
-  max-width: 100%;
+  box-shadow: 0 0 0 3.5px var(--primary-glow);
 }
 
 select {
@@ -109,48 +152,147 @@ select {
   padding-right: 32px;
 }
 
-input[type="textarea"], textarea {
-  resize: vertical;
-  min-height: 120px;
+select:disabled {
+  background-color: var(--slate-100);
+  color: var(--slate-400);
+  cursor: not-allowed;
+  border-color: var(--slate-200);
+}
+
+.select-with-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.select-with-date select {
+  flex: 1;
+}
+
+.select-with-date input[type="date"] {
+  width: 150px;
 }
 
 input[type="date"] {
   height: 42px;
-  font-family: inherit;
-  font-size: 13.5px;
-}
-
-/* Radio button row container styling */
-.form-row label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 500;
   cursor: pointer;
 }
 
-.form-row input[type="radio"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--primary);
-  margin: 0;
-  cursor: pointer;
-}
-
-/* File Upload custom look indicator */
 input[type="file"] {
   padding: 8px;
   background-color: var(--slate-50);
   border: 1.5px dashed var(--slate-300);
   cursor: pointer;
+  border-radius: var(--radius-xs);
 }
 
 input[type="file"]:hover {
-  background-color: var(--slate-100);
+  background-color: var(--primary-light);
   border-color: var(--primary);
 }
 
-/* Error and warning alerts */
+textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.radio-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+.radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.radio-label input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.contact-role-block,
+.landscape-block {
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-sm);
+  padding: 18px 20px 10px;
+  margin-bottom: 20px;
+}
+
+.editable-contact-block {
+  border-left: 4px solid var(--primary);
+  background: #ffffff;
+  box-shadow: var(--shadow-subtle);
+}
+
+.section-header-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--slate-200);
+  flex-wrap: wrap;
+}
+
+.section-title-edit-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 280px;
+}
+
+.section-title-edit-box label {
+  font-weight: 800;
+  color: var(--slate-800);
+  white-space: nowrap;
+}
+
+.editable-section-title-input {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: var(--primary-hover) !important;
+  border: 1.5px solid var(--primary-border) !important;
+  background: var(--primary-light) !important;
+}
+
+.editable-section-title-input:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3.5px var(--primary-glow) !important;
+  background: #ffffff !important;
+}
+
+.btn-delete-section {
+  background: var(--danger-bg);
+  color: var(--danger-hover);
+  border: 1px solid var(--danger-border);
+  padding: 7px 16px;
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-delete-section:hover {
+  background: var(--danger);
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.35);
+}
+
 .error {
   color: var(--danger);
   font-size: 12px;
@@ -162,29 +304,26 @@ input[type="file"]:hover {
   border-color: var(--danger) !important;
 }
 
-/* Buttons */
-.submit {
-  background: var(--primary-gradient);
-  color: white;
-  padding: 12px 24px;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 15px;
-  font-weight: 700;
-  font-family: inherit;
-  box-shadow: 0 4px 12px rgba(211, 100, 11, 0.2);
-  transition: all var(--transition-fast);
+.form-submit-row {
   margin-top: 10px;
 }
 
-.submit:hover {
-  box-shadow: 0 6px 16px rgba(211, 100, 11, 0.35);
-  transform: translateY(-1px);
+.btn-create-lead-submit {
+  background: var(--primary-gradient);
+  color: #ffffff;
+  padding: 13px 32px;
+  border: none;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3);
+  transition: all var(--transition-fast);
 }
 
-.submit:active {
-  transform: translateY(0);
+.btn-create-lead-submit:hover {
+  box-shadow: 0 6px 18px rgba(249, 115, 22, 0.42);
+  transform: translateY(-1px);
 }
 
 .add-section {
@@ -192,7 +331,7 @@ input[type="file"]:hover {
   background-color: transparent;
   color: var(--slate-700);
   border: 1.5px solid var(--slate-300);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
@@ -200,22 +339,30 @@ input[type="file"]:hover {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
 .add-section:hover {
   border-color: var(--primary);
   color: var(--primary);
-  background-color: var(--primary-glow);
+  background-color: var(--primary-light);
 }
 
 @media (max-width: 768px) {
   .form-section {
-    padding: 20px;
+    padding: 18px;
   }
   
   .form-group {
     flex-basis: 100%;
   }
-}
 
+  .select-with-date {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .select-with-date input[type="date"] {
+    width: 100%;
+  }
+}

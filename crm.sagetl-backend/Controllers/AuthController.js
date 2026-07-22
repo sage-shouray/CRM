@@ -7,50 +7,47 @@ const transporter = require("../Models/emailService");
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ message: "Email and password are required.", success: false });
+    }
+
     const user = await UserModel.findOne({ email });
     const errorMsg = "Auth failed email or password is wrong";
-     if (!email || !password) {
-       return res
-         .status(400)
-         .json({ message: "Email and password are required.", success: false });
-     }
-     if (!user || user.status === "inactive") {
-       return res.status(403).json({
-         success: false,
-         message: user
-           ? "Your account is inactive."
-           : "Invalid email or password",
-       });
-     }
-    if (!user) {
-      return res
-        .status(403)
-        .json({
-          message: errorMsg,
-          success: false,
-        });
+
+    if (!user || user.status === "inactive") {
+      return res.status(403).json({
+        success: false,
+        message: user ? "Your account is inactive." : "Invalid email or password",
+      });
     }
-    const isPassEqual = await bcrypt.compare(password,user.password);
-    if(!isPassEqual){
-        return res.status(403).json({
-          message: errorMsg,
-          success: false,
-        });
+
+    const isPassEqual = await bcrypt.compare(password, user.password);
+    if (!isPassEqual) {
+      return res.status(403).json({
+        message: errorMsg,
+        success: false,
+      });
     }
-  const jwtToken = jwt.sign(
-    { email: user.email, _id: user._id },
-    process.env.JWT_SECRET,
-    { expiresIn: "24h" }
-  );
-  res.status(200).json({
-    message: "login sucessful",
-    success: true,
-    jwtToken,
-    email,
-    firstName: user.firstName,
-    userId: user._id, // Add this line to include the userId in the response
-  });
+
+    const jwtToken = jwt.sign(
+      { email: user.email, _id: user._id, role: user.role },
+      process.env.JWT_SECRET || "default_secret",
+      { expiresIn: "24h" }
+    );
+
+    res.status(200).json({
+      message: "login sucessful",
+      success: true,
+      jwtToken,
+      email: user.email,
+      firstName: user.firstName,
+      userId: user._id,
+      role: user.role,
+    });
   } catch (err) {
+    console.error("Login error:", err);
     res.status(500).json({
       message: "Internal server error",
       success: false,
@@ -69,15 +66,15 @@ const forgotPassword = async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
-   const token = jwt.sign(
-     {
-       _id: user._id,
-       firstName: user.firstName,
-       role: user.role,
-     },
-     process.env.JWT_SECRET,
-     { expiresIn: "24h" }
-   );
+    const token = jwt.sign(
+      {
+        _id: user._id,
+        firstName: user.firstName,
+        role: user.role,
+      },
+      process.env.JWT_SECRET || "default_secret",
+      { expiresIn: "24h" }
+    );
     const resetLink = `http://localhost:3000/reset-password/${token}`;
 
     const mailOptions = {
@@ -96,7 +93,6 @@ const forgotPassword = async (req, res) => {
     transporter.sendMail(mailOptions, (error, info) => {
       if (error) {
         console.error("Error sending email:", error);
-     
         return res
           .status(500)
           .json({ success: false, message: "Error sending email" });
@@ -106,17 +102,13 @@ const forgotPassword = async (req, res) => {
     });
   } catch (error) {
     console.error("Server error:", error);
- 
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-
 const resetPassword = async (req, res) => {
   try {
     const { token, password } = req.body;
-
-    
 
     if (!password) {
       return res
@@ -126,15 +118,14 @@ const resetPassword = async (req, res) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
+      decoded = jwt.verify(token, process.env.JWT_SECRET || "default_secret");
     } catch (error) {
       if (error.name === "TokenExpiredError") {
         return res
           .status(400)
           .json({ success: false, message: "Token has expired" });
       }
-      console.error("Token verification error:", error); // Log the error for better insight
+      console.error("Token verification error:", error);
       return res.status(400).json({ success: false, message: "Invalid token" });
     }
 

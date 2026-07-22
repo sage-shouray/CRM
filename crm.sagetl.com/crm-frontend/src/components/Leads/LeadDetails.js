@@ -48,6 +48,7 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
         setOptions((prevOptions) => ({
           ...prevOptions,
           ...optionsResponse.data,
+          leadTypeOptions: ["Net New", "SAP Installed Base"],
           bdmOptions: userNamesResponse.data,
           leadAssignedToOptions: userNamesResponse.data,
         }));
@@ -59,40 +60,39 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
     fetchOptions();
   }, []);
 
- const handleInputChange = (e, section, subSection) => {
-   const { name, value } = e.target;
-   setEditedLead((prevLead) => {
-     const updatedLead = { ...prevLead };
-     if (section === "companyInfo") {
-       updatedLead.companyInfo = { ...updatedLead.companyInfo, [name]: value };
-     } else if (
-       section === "itLandscape" &&
-       subSection === "SAPInstalledBase"
-     ) {
-       updatedLead.itLandscape = {
-         ...updatedLead.itLandscape,
-         SAPInstalledBase: {
-           ...updatedLead.itLandscape.SAPInstalledBase,
-           [name]: value,
-         },
-       };
-     } else if (subSection) {
-       updatedLead[section] = {
-         ...updatedLead[section],
-         [subSection]: { ...updatedLead[section][subSection], [name]: value },
-       };
-     } else {
-       updatedLead[section] = { ...updatedLead[section], [name]: value };
-     }
-     return updatedLead;
-   });
- };
-
+  const handleInputChange = (e, section, subSection) => {
+    const { name, value } = e.target;
+    setEditedLead((prevLead) => {
+      const updatedLead = { ...prevLead };
+      if (section === "companyInfo") {
+        updatedLead.companyInfo = { ...updatedLead.companyInfo, [name]: value };
+      } else if (
+        section === "itLandscape" &&
+        subSection === "SAPInstalledBase"
+      ) {
+        updatedLead.itLandscape = {
+          ...updatedLead.itLandscape,
+          SAPInstalledBase: {
+            ...updatedLead.itLandscape?.SAPInstalledBase,
+            [name]: value,
+          },
+        };
+      } else if (subSection) {
+        updatedLead[section] = {
+          ...updatedLead[section],
+          [subSection]: { ...updatedLead[section]?.[subSection], [name]: value },
+        };
+      } else {
+        updatedLead[section] = { ...updatedLead[section], [name]: value };
+      }
+      return updatedLead;
+    });
+  };
 
   const handleAddDescription = async () => {
     if (!newDescription.trim()) return;
     try {
-      const userId = localStorage.getItem("userId"); // Get userId from localStorage
+      const userId = localStorage.getItem("userId");
       const response = await axios.post(
         `${API_BASE_URL}/api/leads/${leadNumber}/descriptions`,
         { description: newDescription, userId }
@@ -105,146 +105,142 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
     }
   };
 
- const handleSave = async () => {
-   try {
-     const leadToSave = {
-       ...editedLead,
-       itLandscape: {
-         ...editedLead.itLandscape,
-         SAPInstalledBase: editedLead.itLandscape?.SAPInstalledBase || {},
-       },
-     };
+  const handleSave = async () => {
+    try {
+      const leadToSave = {
+        ...editedLead,
+        itLandscape: {
+          ...editedLead.itLandscape,
+          SAPInstalledBase: editedLead.itLandscape?.SAPInstalledBase || {},
+        },
+      };
 
-     const response = await axios.put(
-       `${API_BASE_URL}/api/leads/${leadNumber}`,
-       leadToSave
-     );
-     setLead(response.data);
-     setEditMode(false);
-     onUpdate();
-   } catch (err) {
-     setError(
-       err.response?.data?.error || "An error occurred while saving changes"
-     );
-   }
- };
+      const response = await axios.put(
+        `${API_BASE_URL}/api/leads/${leadNumber}`,
+        leadToSave
+      );
+      setLead(response.data);
+      setEditMode(false);
+      onUpdate();
+    } catch (err) {
+      setError(
+        err.response?.data?.error || "An error occurred while saving changes"
+      );
+    }
+  };
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
   if (!lead) return <div>No lead found</div>;
 
   const renderFields = (config, section, subSection = null) => {
-  return Array.isArray(config)
-    ? config.map((row, rowIndex) => (
-        <div className="form-row-ld" key={rowIndex}>
-          {Array.isArray(row) &&
-            row.map((field) => (
-              <div
-                className="form-group-ld"
-                key={field.name}
-                style={{ display: "flex", alignItems: "center" }}
-              >
-                <label>{field.label}:</label>
+    return Array.isArray(config)
+      ? config.map((row, rowIndex) => (
+          <div className="form-row-ld" key={rowIndex}>
+            {Array.isArray(row) &&
+              row.map((field) => (
+                <div
+                  className="form-group-ld"
+                  key={field.name}
+                  style={{ display: "flex", alignItems: "center" }}
+                >
+                  <label>{field.label}:</label>
 
-                {field.type === "select" ? (
-                  <select
-                    name={field.name}
-                    value={
-                      subSection
-                        ? editedLead?.[section]?.[subSection]?.[field.name] || ""
-                        : editedLead?.[section]?.[field.name] || ""
-                    }
-                    onChange={(e) =>
-                      handleInputChange(e, section, subSection)
-                    }
-                    disabled={!editMode}
-                    style={{ marginRight: "10px" }}
-                  >
-                    <option value="">Select {field.label}</option>
-                    {options[field.options]?.map((option, index) => (
-                      <option key={index} value={option._id || option}>
-                        {typeof option === "object" &&
-                        option.firstName &&
-                        option.lastName
-                          ? `${option.firstName} ${option.lastName}`
-                          : option}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type={field.type}
-                    name={field.name}
-                    value={
-                      subSection
-                        ? editedLead?.[section]?.[subSection]?.[field.name] || ""
-                        : editedLead?.[section]?.[field.name] || ""
-                    }
-                    onChange={(e) =>
-                      handleInputChange(e, section, subSection)
-                    }
-                    disabled={!editMode}
-                    style={{ marginRight: "10px" }}
-                  />
-                )}
+                  {field.type === "select" ? (
+                    <select
+                      name={field.name}
+                      value={
+                        subSection
+                          ? editedLead?.[section]?.[subSection]?.[field.name] || ""
+                          : editedLead?.[section]?.[field.name] || ""
+                      }
+                      onChange={(e) =>
+                        handleInputChange(e, section, subSection)
+                      }
+                      disabled={!editMode}
+                      style={{ marginRight: "10px" }}
+                    >
+                      <option value="">Select {field.label}</option>
+                      {(options[field.options] || (field.name === "leadType" ? ["Net New", "SAP Installed Base"] : []))?.map((option, index) => (
+                        <option key={index} value={option._id || option}>
+                          {typeof option === "object" &&
+                          option.firstName &&
+                          option.lastName
+                            ? `${option.firstName} ${option.lastName}`
+                            : option}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type={field.type}
+                      name={field.name}
+                      value={
+                        subSection
+                          ? editedLead?.[section]?.[subSection]?.[field.name] || ""
+                          : editedLead?.[section]?.[field.name] || ""
+                      }
+                      onChange={(e) =>
+                        handleInputChange(e, section, subSection)
+                      }
+                      disabled={!editMode}
+                      style={{ marginRight: "10px" }}
+                    />
+                  )}
 
-                {/* Render the date picker inline */}
-                {field.datePicker && (
-                  <input
-                    type="date"
-                    name={field.datePicker.name}
-                    value={
-                      editedLead?.[section]?.[field.datePicker.name] || ""
-                    }
-                    onChange={(e) =>
-                      handleInputChange(e, section, subSection)
-                    }
-                    disabled={!editMode}
-                    style={{ flex: "0 0 150px" }}
-                  />
-                )}
-              </div>
-            ))}
-        </div>
-      ))
-    : null;
-};
-
+                  {field.datePicker && (
+                    <input
+                      type="date"
+                      name={field.datePicker.name}
+                      value={
+                        editedLead?.[section]?.[field.datePicker.name] || ""
+                      }
+                      onChange={(e) =>
+                        handleInputChange(e, section, subSection)
+                      }
+                      disabled={!editMode}
+                    />
+                  )}
+                </div>
+              ))}
+          </div>
+        ))
+      : null;
+  };
 
   const renderContactFields = (role) => {
-    const fields = [
-      "name",
-      "dlExt",
-      "designation",
-      "mobile",
-      "email",
-      "personalEmail",
-    ];
-
-    const rows = [];
-    for (let i = 0; i < fields.length; i += 3) {
-      rows.push(fields.slice(i, i + 3)); // Create rows with 3 fields each
-    }
+    const contactData = editedLead.contactInfo?.[role] || {};
+    const fieldsConfig = contactFormConfig.find((c) => c.role.toLowerCase().replace(/\s+/g, '') === role.toLowerCase() || (role === 'businessHead' && c.role === 'Business Head'))?.fields || [];
 
     return (
-      <div key={role} className="form-section-ld">
-        <h4>{role.charAt(0).toUpperCase() + role.slice(1)}</h4>
-        {rows.map((row, rowIndex) => (
-          <div className="form-row-ld" key={rowIndex}>
-            {row.map((field) => (
-              <div className="form-group-ld" key={field}>
-                <label>{field.charAt(0).toUpperCase() + field.slice(1)}:</label>
-                <input
-                  type="text"
-                  name={field}
-                  value={editedLead?.contactInfo?.[role]?.[field] || ""}
-                  onChange={(e) => handleInputChange(e, "contactInfo", role)}
-                  disabled={!editMode}
-                />
-              </div>
-            ))}
-          </div>
-        ))}
+      <div className="contact-role-ld">
+        <h4>{role.toUpperCase()} Contact</h4>
+        <div className="form-row-ld">
+          {fieldsConfig.map((field) => (
+            <div className="form-group-ld" key={field.name}>
+              <label>{field.label}:</label>
+              <input
+                type={field.type}
+                name={field.name}
+                value={contactData[field.name] || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setEditedLead((prev) => ({
+                    ...prev,
+                    contactInfo: {
+                      ...prev.contactInfo,
+                      [role]: {
+                        ...prev.contactInfo?.[role],
+                        [field.name]: val,
+                      },
+                    },
+                  }));
+                }}
+                disabled={!editMode}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     );
   };

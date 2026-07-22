@@ -1,12 +1,18 @@
 [
-    {
+  {
+    "name": "Super Admin",
+    "email": "admin@sagetl.com",
+    "password": "Admin@1234",
+    "role": "admin",
+    "userId": "ADM000"
+  },
+  {
     "name": "Nishtha",
     "email": "nichawla@sagetl.com",
     "password": "Sage123",
     "role": "admin",
     "userId": "ADM001"
   },
-
   {
     "name": "Vaidehi Bhardwaj",
     "email": "bhardwajvaidehi12@gmail.com",
@@ -22,5 +28,4 @@
     "userId": "SUB001",
     "supervisorEmail": "bhardwajvaidehi12@gmail.com"
   }
-
 ]
