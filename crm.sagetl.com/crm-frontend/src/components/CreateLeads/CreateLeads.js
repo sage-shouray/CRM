@@ -29,6 +29,7 @@ const FormGroup = ({
   const isCountry = field.isCascadingCountry;
   const isState = field.isCascadingState;
   const isCity = field.isCascadingCity;
+  const isDisabled = field.name === "reason" && formData.leadUsable === "Yes";
 
   return (
     <div className={`form-group ${isPrimary ? "primary-company-field full-width" : ""}`}>
@@ -41,6 +42,7 @@ const FormGroup = ({
           name={field.name}
           value={formData[field.name] || ""}
           onChange={onCountrySelect || handleChange}
+          disabled={isDisabled}
           className={`cascading-select ${errors[field.name] ? "mandatory" : ""}`}
         >
           <option value="">Select Country</option>
@@ -55,7 +57,7 @@ const FormGroup = ({
           name={field.name}
           value={formData[field.name] || ""}
           onChange={onStateSelect || handleChange}
-          disabled={!formData.country}
+          disabled={isDisabled || !formData.country}
           className={`cascading-select ${errors[field.name] ? "mandatory" : ""}`}
         >
           <option value="">
@@ -73,7 +75,7 @@ const FormGroup = ({
             name={field.name}
             value={formData[field.name] || ""}
             onChange={onCitySelect || handleChange}
-            disabled={!formData.state}
+            disabled={isDisabled || !formData.state}
             className={`cascading-select ${errors[field.name] ? "mandatory" : ""}`}
           >
             <option value="">
@@ -93,39 +95,74 @@ const FormGroup = ({
             placeholder={!formData.state ? "Select State First" : "Enter City"}
             value={formData[field.name] || ""}
             onChange={handleChange}
-            disabled={!formData.state}
+            disabled={isDisabled || !formData.state}
             className={errors[field.name] ? "mandatory" : ""}
           />
         )
       ) : field.type === "select" ? (
-        <div className="select-with-date">
-          <select
-            name={field.name}
-            value={formData[field.name] || ""}
-            onChange={handleChange}
-            className={errors[field.name] ? "mandatory" : ""}
-          >
-            <option value="">Select {field.label}</option>
-            {options[field.options]?.map((option, index) => (
-              <option key={index} value={option._id || option}>
-                {typeof option === "object" && option.firstName && option.lastName
-                  ? `${option.firstName} ${option.lastName}`
-                  : option}
-              </option>
-            ))}
-          </select>
-          {field.datePicker && (
+        <>
+          <div className="select-with-date">
+            <select
+              name={field.name}
+              value={
+                field.name === "vertical" && 
+                formData[field.name] && 
+                options[field.options] && 
+                !options[field.options].includes(formData[field.name])
+                  ? "Others"
+                  : formData[field.name] || ""
+              }
+              onChange={(e) => {
+                if (field.name === "vertical" && e.target.value === "Others") {
+                  handleChange({ target: { name: field.name, value: "Others" } });
+                } else {
+                  handleChange(e);
+                }
+              }}
+              disabled={isDisabled}
+              className={errors[field.name] ? "mandatory" : ""}
+            >
+              <option value="" disabled>Select {field.label}</option>
+              {options[field.options]?.map((option, index) => (
+                <option key={index} value={option._id || option}>
+                  {typeof option === "object" && option.firstName && option.lastName
+                    ? `${option.firstName} ${option.lastName}`
+                    : option}
+                </option>
+              ))}
+            </select>
+            {field.datePicker && (
+              <input
+                type="date"
+                name={field.datePicker.name}
+                value={formData[field.datePicker.name] || ""}
+                onChange={handleChange}
+                onClick={(e) => e.target.showPicker?.()}
+                disabled={isDisabled}
+                className={errors[field.datePicker.name] ? "mandatory" : ""}
+                title="Click to select date from calendar"
+              />
+            )}
+          </div>
+          {field.name === "vertical" && 
+            (formData[field.name] === "Others" || 
+             (formData[field.name] && 
+              options[field.options] && 
+              !options[field.options].includes(formData[field.name]))) && (
             <input
-              type="date"
-              name={field.datePicker.name}
-              value={formData[field.datePicker.name] || ""}
-              onChange={handleChange}
-              onClick={(e) => e.target.showPicker?.()}
-              className={errors[field.datePicker.name] ? "mandatory" : ""}
-              title="Click to select date from calendar"
+              type="text"
+              name="verticalCustom"
+              placeholder="Specify custom vertical..."
+              value={formData[field.name] === "Others" ? "" : formData[field.name]}
+              onChange={(e) => {
+                handleChange({ target: { name: field.name, value: e.target.value || "Others" } });
+              }}
+              disabled={isDisabled}
+              className={errors[field.name] ? "mandatory" : ""}
+              style={{ marginTop: "6px" }}
             />
           )}
-        </div>
+        </>
       ) : field.type === "date" ? (
         <input
           type="date"
@@ -134,6 +171,7 @@ const FormGroup = ({
           value={formData[field.name] || ""}
           onChange={handleChange}
           onClick={(e) => e.target.showPicker?.()}
+          disabled={isDisabled}
           className={errors[field.name] ? "mandatory" : ""}
           title="Click to select date from calendar"
         />
@@ -145,6 +183,7 @@ const FormGroup = ({
           value={formData[field.name] || ""}
           onChange={handleChange}
           placeholder={isPrimary ? "Enter Company Name (Primary Field)..." : ""}
+          disabled={isDisabled}
           className={`${isPrimary ? "primary-input" : ""} ${errors[field.name] ? "mandatory" : ""}`}
         />
       )}
@@ -217,13 +256,17 @@ const CreateLeads = () => {
           axios.get(`${API_BASE_URL}/api/options`),
           axios.get(`${API_BASE_URL}/api/users`),
         ]);
-        const userNames = userNamesResponse.data.map(user => user.firstName);
+        const allUsers = userNamesResponse.data || [];
+        const bdmNames = allUsers
+          .filter(user => (user.designation || "").toUpperCase() === "BDM")
+          .map(user => user.firstName);
+        const allUserNames = allUsers.map(user => user.firstName);
         setOptions((prevOptions) => ({
           ...prevOptions,
           ...optionsResponse.data,
           leadTypeOptions: ["Net New", "SAP Installed Base"],
-          bdmOptions: userNames,
-          leadAssignedToOptions: userNames,
+          bdmOptions: bdmNames,
+          leadAssignedToOptions: allUsers,
         }));
       } catch (error) {
         console.error("Error fetching options", error);
@@ -268,15 +311,26 @@ const CreateLeads = () => {
           },
         };
       } else if (section) {
+        const updatedSection = { ...prevData[section], [name]: parsedValue };
+        if (section === "company" && name === "leadUsable" && parsedValue === "Yes") {
+          updatedSection.reason = "";
+        }
         return {
           ...prevData,
-          [section]: { ...prevData[section], [name]: parsedValue },
+          [section]: updatedSection,
         };
       } else {
         return { ...prevData, [name]: value };
       }
     });
-    setErrors((prevErrors) => ({ ...prevErrors, [name]: "" }));
+
+    setErrors((prevErrors) => {
+      const nextErrors = { ...prevErrors, [name]: "" };
+      if (section === "company" && name === "leadUsable" && parsedValue === "Yes") {
+        nextErrors.reason = "";
+      }
+      return nextErrors;
+    });
   }, []);
 
   // Cascading Location Select Handlers
@@ -371,7 +425,11 @@ const CreateLeads = () => {
     const newErrors = {};
     const validateSection = (config, data, section) => {
       config.flat().forEach((field) => {
-        if (field.required && !data[field.name]?.toString().trim()) {
+        let isRequired = field.required;
+        if (section === "company" && field.name === "reason" && formData.company?.leadUsable === "No") {
+          isRequired = true;
+        }
+        if (isRequired && !data[field.name]?.toString().trim()) {
           newErrors[field.name] = `${field.label} is required`;
         }
         if (field.datePicker?.required && !data[field.datePicker.name]) {
@@ -582,42 +640,340 @@ const CreateLeads = () => {
           {(!formData.company?.leadType || formData.company?.leadType === "Net New") && (
             <div className="landscape-block">
               <h2>Net New</h2>
-              {itLandscapeConfig.netNew.map((row, rowIndex) => (
-                <FormRow key={`netNew-${rowIndex}`}>
-                  {row.map((field) => (
-                    <FormGroup
-                      key={field.name}
-                      field={field}
-                      formData={formData.itLandscape.netNew}
-                      handleChange={(e) => handleChange(e, "itLandscape", "netNew")}
-                      errors={errors}
-                      options={options}
-                    />
-                  ))}
+
+              {/* Row 1: Using ERP | Budget | Opportunity */}
+              <FormRow>
+                <div className="form-group">
+                  <label htmlFor="usingERP">Using ERP:</label>
+                  <select
+                    name="usingERP"
+                    id="usingERP"
+                    value={formData.itLandscape.netNew?.usingERP || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "netNew")}
+                    className={errors.usingERP ? "mandatory" : ""}
+                  >
+                    <option value="" disabled>Select</option>
+                    {options.usingERPOptions?.map((o, i) => <option key={i} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="budget">Budget:</label>
+                  <input
+                    type="text"
+                    id="budget"
+                    name="budget"
+                    value={formData.itLandscape.netNew?.budget || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "netNew")}
+                    className={errors.budget ? "mandatory" : ""}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="opportunityForUs1">Opportunity:</label>
+                  <select
+                    name="opportunityForUs1"
+                    id="opportunityForUs1"
+                    value={formData.itLandscape.netNew?.opportunityForUs1 || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "netNew")}
+                    className={errors.opportunityForUs1 ? "mandatory" : ""}
+                  >
+                    <option value="" disabled>Select Opportunity</option>
+                    {options.opportunityOptions?.map((o, i) => <option key={i} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              </FormRow>
+
+              {/* Conditional: If yes → ERP picker | If no → Why */}
+              {formData.itLandscape.netNew?.usingERP === "Yes" && (
+                <FormRow>
+                  <div className="form-group">
+                    <label htmlFor="ifYesWhichOne">If yes, which ERP:</label>
+                    <select
+                      name="ifYesWhichOne"
+                      id="ifYesWhichOne"
+                      value={formData.itLandscape.netNew?.ifYesWhichOne || ""}
+                      onChange={(e) => handleChange(e, "itLandscape", "netNew")}
+                      className={errors.ifYesWhichOne ? "mandatory" : ""}
+                    >
+                      <option value="" disabled>Select ERP</option>
+                      {options.ERPTypeOptions?.map((o, i) => <option key={i} value={o}>{o}</option>)}
+                    </select>
+                  </div>
                 </FormRow>
-              ))}
+              )}
+
+              {formData.itLandscape.netNew?.usingERP === "No" && (
+                <FormRow>
+                  <div className="form-group">
+                    <label htmlFor="ifNoWhy">If no, why:</label>
+                    <select
+                      name="ifNoWhy"
+                      id="ifNoWhy"
+                      value={formData.itLandscape.netNew?.ifNoWhy || ""}
+                      onChange={(e) => handleChange(e, "itLandscape", "netNew")}
+                      className={errors.ifNoWhy ? "mandatory" : ""}
+                    >
+                      <option value="" disabled>Select reason</option>
+                      {options.noWhyOptions?.map((o, i) => <option key={i} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                </FormRow>
+              )}
+
+              {/* Row 2: Authority | Opportunity Value (whole numbers only) | Need */}
+              <FormRow>
+                <div className="form-group">
+                  <label htmlFor="authority">Authority:</label>
+                  <input
+                    type="text"
+                    id="authority"
+                    name="authority"
+                    value={formData.itLandscape.netNew?.authority || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "netNew")}
+                    className={errors.authority ? "mandatory" : ""}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="opportunityValue1">Opportunity Value:</label>
+                  <input
+                    type="text"
+                    id="opportunityValue1"
+                    name="opportunityValue1"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={formData.itLandscape.netNew?.opportunityValue1 || ""}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9]/g, "");
+                      handleChange({ target: { name: "opportunityValue1", value: raw } }, "itLandscape", "netNew");
+                    }}
+                    placeholder="Enter whole number only"
+                    className={errors.opportunityValue1 ? "mandatory" : ""}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="need">Need:</label>
+                  <input
+                    type="text"
+                    id="need"
+                    name="need"
+                    value={formData.itLandscape.netNew?.need || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "netNew")}
+                    className={errors.need ? "mandatory" : ""}
+                  />
+                </div>
+              </FormRow>
+
+              {/* Row 3: Timeframe */}
+              <FormRow>
+                <div className="form-group">
+                  <label htmlFor="timeframe">Timeframe:</label>
+                  <select
+                    name="timeframe"
+                    id="timeframe"
+                    value={formData.itLandscape.netNew?.timeframe || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "netNew")}
+                    className={errors.timeframe ? "mandatory" : ""}
+                  >
+                    <option value="" disabled>Select Timeframe</option>
+                    {options.timeframeOptions?.map((o, i) => <option key={i} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              </FormRow>
             </div>
           )}
 
           {(!formData.company?.leadType || formData.company?.leadType === "SAP Installed Base") && (
             <div className="landscape-block">
               <h2>SAP Installed Base</h2>
-              {itLandscapeConfig.SAPInstalledBase.map((row, rowIndex) => (
-                <FormRow key={`SAPInstalledBase-${rowIndex}`}>
-                  {row.map((field) => (
-                    <FormGroup
-                      key={field.name}
-                      field={field}
-                      formData={formData.itLandscape.SAPInstalledBase}
-                      handleChange={(e) =>
-                        handleChange(e, "itLandscape", "SAPInstalledBase")
-                      }
-                      errors={errors}
-                      options={options}
-                    />
-                  ))}
-                </FormRow>
-              ))}
+
+              {/* Row 1: Opportunity for us available | Year of Implementation | No. of Users */}
+              <FormRow>
+                <div className="form-group">
+                  <label htmlFor="opportunityForUs2">Opportunity for us available:</label>
+                  <select
+                    name="opportunityForUs2"
+                    id="opportunityForUs2"
+                    value={formData.itLandscape.SAPInstalledBase?.opportunityForUs2 || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.opportunityForUs2 ? "mandatory" : ""}
+                  >
+                    <option value="" disabled>Select</option>
+                    {options.opportunityOptions?.map((o, i) => <option key={i} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="yearOfImplementation">Year of Implementation:</label>
+                  <input
+                    type="text"
+                    id="yearOfImplementation"
+                    name="yearOfImplementation"
+                    value={formData.itLandscape.SAPInstalledBase?.yearOfImplementation || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.yearOfImplementation ? "mandatory" : ""}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="noOfUsers">No. of Users:</label>
+                  <input
+                    type="number"
+                    id="noOfUsers"
+                    name="noOfUsers"
+                    value={formData.itLandscape.SAPInstalledBase?.noOfUsers || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.noOfUsers ? "mandatory" : ""}
+                  />
+                </div>
+              </FormRow>
+
+              {/* Row 2: Opportunity Value (numeric only) | Contract Expiry | Support Partner */}
+              <FormRow>
+                <div className="form-group">
+                  <label htmlFor="opportunityValue2">Opportunity Value:</label>
+                  <input
+                    type="text"
+                    id="opportunityValue2"
+                    name="opportunityValue2"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={formData.itLandscape.SAPInstalledBase?.opportunityValue2 || ""}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9]/g, "");
+                      handleChange({ target: { name: "opportunityValue2", value: raw } }, "itLandscape", "SAPInstalledBase");
+                    }}
+                    placeholder="Enter whole number only"
+                    className={errors.opportunityValue2 ? "mandatory" : ""}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="contractExpiry">Contract Expiry:</label>
+                  <select
+                    name="contractExpiry"
+                    id="contractExpiry"
+                    value={formData.itLandscape.SAPInstalledBase?.contractExpiry || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.contractExpiry ? "mandatory" : ""}
+                  >
+                    <option value="" disabled>Select</option>
+                    {options.expiryOptions?.map((o, i) => <option key={i} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="supportPartner">Support Partner:</label>
+                  <select
+                    name="supportPartner"
+                    id="supportPartner"
+                    value={formData.itLandscape.SAPInstalledBase?.supportPartner || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.supportPartner ? "mandatory" : ""}
+                  >
+                    <option value="" disabled>Select</option>
+                    {options.partnerOptions?.map((o, i) => <option key={i} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              </FormRow>
+
+              {/* Row 3: Opportunity for (custom dropdown) | Exact Version | Hardware */}
+              <FormRow>
+                <div className="form-group">
+                  <label htmlFor="opportunityForUs3">Opportunity for:</label>
+                  <select
+                    name="opportunityForUs3"
+                    id="opportunityForUs3"
+                    value={formData.itLandscape.SAPInstalledBase?.opportunityForUs3 || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.opportunityForUs3 ? "mandatory" : ""}
+                  >
+                    <option value="" disabled>Select type</option>
+                    {options.opportunityForUs3Options?.map((o, i) => <option key={i} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="exactVersion">Exact Version:</label>
+                  <select
+                    name="exactVersion"
+                    id="exactVersion"
+                    value={formData.itLandscape.SAPInstalledBase?.exactVersion || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.exactVersion ? "mandatory" : ""}
+                  >
+                    <option value="" disabled>Select</option>
+                    {options.versionOptions?.map((o, i) => <option key={i} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="hardware">Hardware:</label>
+                  <input
+                    type="text"
+                    id="hardware"
+                    name="hardware"
+                    value={formData.itLandscape.SAPInstalledBase?.hardware || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.hardware ? "mandatory" : ""}
+                  />
+                </div>
+              </FormRow>
+
+              {/* Row 4: No. of License | License Value */}
+              <FormRow>
+                <div className="form-group">
+                  <label htmlFor="noOfLicense">No. of License:</label>
+                  <input
+                    type="number"
+                    id="noOfLicense"
+                    name="noOfLicense"
+                    value={formData.itLandscape.SAPInstalledBase?.noOfLicense || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.noOfLicense ? "mandatory" : ""}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="licenseValue">License Value:</label>
+                  <input
+                    type="text"
+                    id="licenseValue"
+                    name="licenseValue"
+                    value={formData.itLandscape.SAPInstalledBase?.licenseValue || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.licenseValue ? "mandatory" : ""}
+                  />
+                </div>
+              </FormRow>
+
+              {/* Row 5: Modules Implemented | Implementation Partner | Total Project Cost */}
+              <FormRow>
+                <div className="form-group">
+                  <label htmlFor="modulesImplemented">Modules Implemented:</label>
+                  <input
+                    type="text"
+                    id="modulesImplemented"
+                    name="modulesImplemented"
+                    value={formData.itLandscape.SAPInstalledBase?.modulesImplemented || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.modulesImplemented ? "mandatory" : ""}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="implementationPartner">Implementation Partner:</label>
+                  <input
+                    type="text"
+                    id="implementationPartner"
+                    name="implementationPartner"
+                    value={formData.itLandscape.SAPInstalledBase?.implementationPartner || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.implementationPartner ? "mandatory" : ""}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="totalProjectCost">Total Project Cost:</label>
+                  <input
+                    type="text"
+                    id="totalProjectCost"
+                    name="totalProjectCost"
+                    value={formData.itLandscape.SAPInstalledBase?.totalProjectCost || ""}
+                    onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
+                    className={errors.totalProjectCost ? "mandatory" : ""}
+                  />
+                </div>
+              </FormRow>
             </div>
           )}
         </section>

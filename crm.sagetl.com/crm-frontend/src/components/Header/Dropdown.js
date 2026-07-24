@@ -19,7 +19,7 @@ import {
 // Mapping dropdown items to paths
 const pathsByItem = {
   "Create Leads": "/create-lead",
-  "Leads List": "/leads",
+  "Company Info": "/leads",
   BI: "/bi",
   "Unassigned Leads": "/unassigned-leads",
   Overview: "/team-overview",
@@ -34,7 +34,7 @@ const pathsByItem = {
 // Mapping items to icons
 const itemIcons = {
   "Create Leads": faPlus,
-  "Leads List": faList,
+  "Company Info": faList,
   BI: faChartPie,
   "Unassigned Leads": faUserSlash,
   Overview: faUsers,
@@ -57,7 +57,7 @@ const categoryIcons = {
   Account: faUser,
 };
 
-function Dropdown({ name, items, isOpen, toggleDropdown }) {
+function Dropdown({ name, items, isOpen, toggleDropdown, isActive }) {
   const navigate = useNavigate();
 
   const handleClick = (item) => {
@@ -69,7 +69,7 @@ function Dropdown({ name, items, isOpen, toggleDropdown }) {
   const catIcon = categoryIcons[name] || faFolderOpen;
 
   return (
-    <div className={`dropdown ${isOpen ? "open" : ""}`}>
+    <div className={`dropdown ${isOpen ? "open" : ""} ${isActive ? "active-dropdown" : ""}`}>
       <button onClick={toggleDropdown} className="dropdown-trigger-btn">
         <FontAwesomeIcon icon={catIcon} className="nav-cat-icon" />
         <span>{name}</span>

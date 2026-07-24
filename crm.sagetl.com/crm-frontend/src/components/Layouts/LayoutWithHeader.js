@@ -4,7 +4,7 @@ import Header from "../Header/Header";
 
 function LayoutWithHeader() {
   return (
-    <div>
+    <div className="app-layout">
       <Header />
       <main>
         <Outlet />

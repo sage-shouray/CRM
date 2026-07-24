@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import ReactDOM from "react-dom";
+import LeadDetails from "../Leads/LeadDetails";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
   faCheckCircle, 
@@ -14,14 +16,19 @@ import {
   faBuilding,
   faAlignLeft,
   faChevronDown,
-  faChevronUp
+  faChevronUp,
+  faSpinner,
+  faCalendarCheck,
+  faPhone,
+  faArrowRight,
+  faBell
 } from "@fortawesome/free-solid-svg-icons";
 import axios from "axios";
 import "./HomeToDoWidget.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
 
-function HomeToDoWidget({ onTaskUpdate }) {
+function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = [], isLoadingLeads, onOpenLead }) {
   const userId = localStorage.getItem("userId") || "default";
   const todayStr = new Date().toISOString().split("T")[0];
 
@@ -104,7 +111,31 @@ function HomeToDoWidget({ onTaskUpdate }) {
     ];
   };
 
-  const [tasks, setTasks] = useState(getInitialTasks);
+  const [tasks, setTasks] = useState([]);
+
+  const fetchTasksFromDB = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const res = await axios.get(`${API_BASE_URL}/api/tasks`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const formatted = (res.data || []).map(t => {
+        if (t.dueDate < todayStr && t.status !== "done" && t.status !== "postponed") {
+          return { ...t, status: "not_done" };
+        }
+        return t;
+      });
+      setTasks(formatted);
+    } catch (err) {
+      console.error("Error fetching tasks from DB:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasksFromDB();
+  }, []);
+  const [internalSelectedDate, setInternalSelectedDate] = useState(todayStr);
   const [availableLeads, setAvailableLeads] = useState(defaultDummyLeads);
   const [activeFilter, setActiveFilter] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -121,32 +152,85 @@ function HomeToDoWidget({ onTaskUpdate }) {
     category: "General"
   });
 
+  const [systemLeads, setSystemLeads] = useState([]);
+  const [isLoadingSystemLeads, setIsLoadingSystemLeads] = useState(true);
+  const [localSelectedLead, setLocalSelectedLead] = useState(null);
+
   // Fetch created leads from system backend
-  useEffect(() => {
-    const fetchLeadsForSelection = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) return;
+  const fetchLeadsForSelection = async () => {
+    try {
+      setIsLoadingSystemLeads(true);
+      const token = localStorage.getItem("token");
+      if (!token) return;
 
-        const res = await axios.get(`${API_BASE_URL}/api/leads`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      const res = await axios.get(`${API_BASE_URL}/api/leads`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-        if (Array.isArray(res.data) && res.data.length > 0) {
-          const mapped = res.data.map((l) => ({
-            leadNumber: l.leadNumber,
-            companyName: l.companyInfo?.companyName || `Lead #${l.leadNumber}`
-          }));
-          // Merge with default dummy leads so testing always has options
-          setAvailableLeads([...mapped, ...defaultDummyLeads]);
-        }
-      } catch (err) {
-        console.error("Error fetching leads for task creation:", err);
+      if (Array.isArray(res.data)) {
+        setSystemLeads(res.data);
+        const mapped = res.data.map((l) => ({
+          leadNumber: l.leadNumber,
+          companyName: l.companyInfo?.companyName || `Lead #${l.leadNumber}`
+        }));
+        // Merge with default dummy leads so testing always has options
+        setAvailableLeads([...mapped, ...defaultDummyLeads]);
       }
-    };
+    } catch (err) {
+      console.error("Error fetching leads for task creation:", err);
+    } finally {
+      setIsLoadingSystemLeads(false);
+    }
+  };
 
+  useEffect(() => {
     fetchLeadsForSelection();
   }, []);
+
+  // Determine which selected date and followups to use
+  const effectiveSelectedDate = selectedDate || internalSelectedDate;
+  
+  // Calculate followups internally if not provided by prop
+  const effectiveFollowups = useMemo(() => {
+    if (selectedDateFollowups && selectedDateFollowups.length > 0) {
+      return selectedDateFollowups;
+    }
+    const followups = [];
+    systemLeads.forEach((lead) => {
+      const actionDate = lead.companyInfo?.dateField 
+        ? lead.companyInfo.dateField.split("T")[0]
+        : lead.companyInfo?.nextActionDate 
+        ? lead.companyInfo.nextActionDate.split("T")[0]
+        : lead.createdAt 
+        ? lead.createdAt.split("T")[0]
+        : null;
+
+      if (actionDate === effectiveSelectedDate) {
+        followups.push({
+          id: `lead-${lead.leadNumber}`,
+          type: 'followup',
+          date: actionDate,
+          title: `Follow-up: ${lead.companyInfo?.companyName || 'Lead #' + lead.leadNumber}`,
+          leadNumber: lead.leadNumber,
+          nextAction: lead.companyInfo?.nextAction || 'Follow Up',
+          priority: lead.companyInfo?.priority || 'Medium',
+          companyName: lead.companyInfo?.companyName || 'N/A',
+          phone: lead.companyInfo?.genericPhone1 || 'N/A'
+        });
+      }
+    });
+    return followups;
+  }, [selectedDateFollowups, systemLeads, effectiveSelectedDate]);
+
+  const effectiveIsLoadingLeads = isLoadingLeads !== undefined ? isLoadingLeads : isLoadingSystemLeads;
+
+  const handleOpenLeadDetails = (leadNum) => {
+    if (onOpenLead) {
+      onOpenLead(leadNum);
+    } else {
+      setLocalSelectedLead(leadNum);
+    }
+  };
 
   // Automatically compute carried forward & not_done status for past tasks
   useEffect(() => {
@@ -161,11 +245,10 @@ function HomeToDoWidget({ onTaskUpdate }) {
   }, [todayStr]);
 
   useEffect(() => {
-    localStorage.setItem(`crm_tasks_${userId}`, JSON.stringify(tasks));
     if (onTaskUpdate) {
       onTaskUpdate(tasks);
     }
-  }, [tasks, userId]);
+  }, [tasks]);
 
   const toggleExpandDescription = (taskId) => {
     setExpandedTaskIds((prev) => ({
@@ -175,17 +258,37 @@ function HomeToDoWidget({ onTaskUpdate }) {
   };
 
   // Status Action 1: Mark Done
-  const handleMarkDone = (taskId) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: "done" } : t))
-    );
+  const handleMarkDone = async (taskId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.put(`${API_BASE_URL}/api/tasks/${taskId}`, {
+        status: "done"
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId || t.taskId === taskId ? res.data : t))
+      );
+    } catch (err) {
+      console.error("Error marking task done:", err);
+    }
   };
 
   // Status Action 2: Mark Not Done
-  const handleMarkNotDone = (taskId) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: "not_done" } : t))
-    );
+  const handleMarkNotDone = async (taskId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.put(`${API_BASE_URL}/api/tasks/${taskId}`, {
+        status: "not_done"
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId || t.taskId === taskId ? res.data : t))
+      );
+    } catch (err) {
+      console.error("Error marking task not done:", err);
+    }
   };
 
   // Status Action 3: Postpone Task
@@ -194,50 +297,60 @@ function HomeToDoWidget({ onTaskUpdate }) {
     setPostponeDate(currentDate || todayStr);
   };
 
-  const handleConfirmPostpone = (taskId) => {
+  const handleConfirmPostpone = async (taskId) => {
     if (!postponeDate) return;
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? {
-              ...t,
-              dueDate: postponeDate,
-              status: "postponed"
-            }
-          : t
-      )
-    );
-    setPostponeTaskId(null);
-    setPostponeDate("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.put(`${API_BASE_URL}/api/tasks/${taskId}`, {
+        dueDate: postponeDate,
+        status: "postponed"
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId || t.taskId === taskId ? res.data : t))
+      );
+      setPostponeTaskId(null);
+      setPostponeDate("");
+    } catch (err) {
+      console.error("Error postponing task:", err);
+    }
   };
 
   // Add new task
-  const handleAddTaskSubmit = (e) => {
+  const handleAddTaskSubmit = async (e) => {
     e.preventDefault();
     if (!newTask.title.trim()) return;
 
-    const taskObj = {
-      id: "task-" + Date.now(),
-      title: newTask.title.trim(),
-      associatedLead: newTask.associatedLead || "General / None",
-      description: newTask.description.trim(),
-      originalDueDate: newTask.dueDate || todayStr,
-      dueDate: newTask.dueDate || todayStr,
-      priority: newTask.priority,
-      category: newTask.category,
-      status: "pending"
-    };
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.post(`${API_BASE_URL}/api/tasks`, {
+        taskId: "task-" + Date.now(),
+        title: newTask.title.trim(),
+        associatedLead: newTask.associatedLead || "General / None",
+        description: newTask.description.trim(),
+        originalDueDate: newTask.dueDate || todayStr,
+        dueDate: newTask.dueDate || todayStr,
+        priority: newTask.priority,
+        category: newTask.category,
+        status: "pending"
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    setTasks((prev) => [taskObj, ...prev]);
-    setNewTask({
-      title: "",
-      associatedLead: "",
-      description: "",
-      dueDate: todayStr,
-      priority: "Medium",
-      category: "General"
-    });
-    setShowAddModal(false);
+      setTasks((prev) => [res.data, ...prev]);
+      setNewTask({
+        title: "",
+        associatedLead: "",
+        description: "",
+        dueDate: todayStr,
+        priority: "Medium",
+        category: "General"
+      });
+      setShowAddModal(false);
+    } catch (err) {
+      console.error("Error adding task:", err);
+    }
   };
 
   // Filter tasks based on status / carry forward
@@ -261,8 +374,8 @@ function HomeToDoWidget({ onTaskUpdate }) {
         <div className="widget-title-group">
           <FontAwesomeIcon icon={faListCheck} className="widget-header-icon" />
           <div>
-            <h3>Assigned Work & To-Do List</h3>
-            <p>Tasks cannot be deleted. Manage status: Done, Postponed, or Not Done.</p>
+            <h3>Schedule Agenda & To-Do List</h3>
+            <p>View follow-ups and manage daily tasks in one unified dashboard.</p>
           </div>
         </div>
 
@@ -275,8 +388,8 @@ function HomeToDoWidget({ onTaskUpdate }) {
         </button>
       </div>
 
-      {/* Pop-up Modal Window for Creating New Task */}
-      {showAddModal && (
+      {/* Pop-up Modal Window for Creating New Task — rendered via Portal to escape overflow:hidden parent */}
+      {showAddModal && ReactDOM.createPortal(
         <div className="add-task-modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="add-task-modal-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header-bar">
@@ -397,207 +510,295 @@ function HomeToDoWidget({ onTaskUpdate }) {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Filter Segmented Control Bar */}
-      <div className="todo-filter-tabs">
-        <div className="tabs-group">
-          <button
-            className={`filter-tab ${activeFilter === "all" ? "active-tab" : ""}`}
-            onClick={() => setActiveFilter("all")}
-          >
-            All ({tasks.length})
-          </button>
-          <button
-            className={`filter-tab ${activeFilter === "today" ? "active-tab" : ""}`}
-            onClick={() => setActiveFilter("today")}
-          >
-            Today / Action
-          </button>
-          <button
-            className={`filter-tab tab-green ${activeFilter === "done" ? "active-tab-green" : ""}`}
-            onClick={() => setActiveFilter("done")}
-          >
-            Done ({doneCount})
-          </button>
-          <button
-            className={`filter-tab tab-red ${activeFilter === "not_done" ? "active-tab-red" : ""}`}
-            onClick={() => setActiveFilter("not_done")}
-          >
-            Not Done ({notDoneCount})
-          </button>
-          <button
-            className={`filter-tab tab-amber ${activeFilter === "postponed" ? "active-tab-amber" : ""}`}
-            onClick={() => setActiveFilter("postponed")}
-          >
-            Postponed ({postponedCount})
-          </button>
-        </div>
-      </div>
-
-      {/* Tasks List */}
-      <div className="todo-items-list">
-        {filteredTasks.length === 0 ? (
-          <div className="empty-tasks-state">
-            <FontAwesomeIcon icon={faCalendarDay} className="empty-icon" />
-            <p>No tasks found for this view.</p>
+      {/* Split Pane Content Container */}
+      <div className="todo-widget-content-split">
+        {/* Left Pane: Selected Date Lead Follow-ups */}
+        <div className="agenda-pane">
+          <div className="agenda-pane-header">
+            <h4>
+              <FontAwesomeIcon icon={faBell} className="pane-icon" />
+              <span>Lead Follow-ups</span>
+              <span className="pane-count-badge">{effectiveFollowups.length}</span>
+            </h4>
+            {selectedDate ? (
+              <span className="agenda-date-label">
+                {selectedDate === todayStr ? "Today's Agenda" : selectedDate}
+              </span>
+            ) : (
+              <input
+                type="date"
+                value={effectiveSelectedDate}
+                onChange={(e) => setInternalSelectedDate(e.target.value)}
+                className="agenda-date-picker-input"
+                title="Select date to filter follow-ups"
+              />
+            )}
           </div>
-        ) : (
-          filteredTasks.map((task) => {
-            const prioLower = (task.priority || "medium").toLowerCase();
-            const isOverdueNotDone = (task.originalDueDate && task.originalDueDate < todayStr && task.status !== "done" && task.status !== "postponed") || task.status === "not_done";
-            const isPostponed = task.status === "postponed";
-            const isDone = task.status === "done";
-            const isExpanded = !!expandedTaskIds[task.id];
 
-            return (
-              <div
-                key={task.id}
-                className={`todo-item-card status-${task.status} prio-border-${prioLower}`}
-              >
-                <div className="task-body-content">
-                  {/* Overdue Carry-Forward Warning Banner */}
-                  {isOverdueNotDone && !isDone && (
-                    <div className="carry-forward-notice">
-                      <FontAwesomeIcon icon={faHistory} />
-                      <span>Not Done on {task.originalDueDate || task.dueDate} • Carried Forward to Today</span>
-                    </div>
-                  )}
+          <div className="agenda-scroll-container">
+            {effectiveIsLoadingLeads ? (
+              <div className="agenda-loading">
+                <FontAwesomeIcon icon={faSpinner} spin className="spinner-icon" />
+                <span>Loading follow-ups...</span>
+              </div>
+            ) : effectiveFollowups.length === 0 ? (
+              <div className="agenda-empty-state">
+                <FontAwesomeIcon icon={faCalendarCheck} className="empty-icon" />
+                <p>No follow-ups scheduled for this date.</p>
+              </div>
+            ) : (
+              <div className="agenda-list">
+                {effectiveFollowups.map((item) => (
+                  <div key={item.id} className="agenda-item-card followup-card">
+                    <div className="item-main-details">
+                      <div className="lead-name-row">
+                        <FontAwesomeIcon icon={faBuilding} className="building-icon" />
+                        <span className="lead-company-name">{item.companyName}</span>
+                        <span className={`priority-badge prio-${(item.priority || 'medium').toLowerCase()}`}>
+                          {item.priority}
+                        </span>
+                      </div>
 
-                  {/* Task Header Line with Title */}
-                  <div className="task-header-line">
-                    <span className={`task-title ${isDone ? "strike-through" : ""}`}>
-                      {task.title}
-                    </span>
-                  </div>
-
-                  {/* Associated Lead Tag */}
-                  {task.associatedLead && (
-                    <div className="task-associated-lead">
-                      <FontAwesomeIcon icon={faBuilding} className="lead-tag-icon" />
-                      <span>Lead: <strong>{task.associatedLead}</strong></span>
-                    </div>
-                  )}
-
-                  {/* Optional Expandable Description */}
-                  {task.description && (
-                    <div className="task-description-box">
-                      <div className="desc-preview">
-                        <FontAwesomeIcon icon={faAlignLeft} className="desc-icon" />
-                        <span className="desc-text">{task.description}</span>
+                      <div className="lead-sub-info">
+                        <span className="info-action"><FontAwesomeIcon icon={faClock} /> {item.nextAction}</span>
+                        <span className="info-phone"><FontAwesomeIcon icon={faPhone} /> {item.phone}</span>
                       </div>
                     </div>
-                  )}
 
-                  {/* Metadata Row: Status, Priority, Category, Date */}
-                  <div className="task-meta-tags">
-                    {/* Status Pill */}
-                    {isDone ? (
-                      <span className="status-pill pill-done">
-                        <FontAwesomeIcon icon={faCheckCircle} /> Done
-                      </span>
-                    ) : isOverdueNotDone ? (
-                      <span className="status-pill pill-not-done">
-                        <FontAwesomeIcon icon={faTimesCircle} /> Not Done
-                      </span>
-                    ) : isPostponed ? (
-                      <span className="status-pill pill-postponed">
-                        <FontAwesomeIcon icon={faClock} /> Postponed
-                      </span>
-                    ) : (
-                      <span className="status-pill pill-pending">Pending</span>
-                    )}
-
-                    <span className={`priority-tag tag-${prioLower}`}>
-                      {task.priority === "High" && <FontAwesomeIcon icon={faExclamationCircle} className="prio-icon" />}
-                      {task.priority} Priority
-                    </span>
-                    <span className="category-tag">{task.category || "General"}</span>
-                    <span className="due-date-tag">
-                      <FontAwesomeIcon icon={faCalendarDay} className="cal-icon" /> {task.dueDate}
-                    </span>
+                    <button
+                      onClick={() => handleOpenLeadDetails(item.leadNumber)}
+                      className="btn-view-lead"
+                      title="View Full Lead Profile"
+                    >
+                      <span>Details</span>
+                      <FontAwesomeIcon icon={faArrowRight} />
+                    </button>
                   </div>
-
-                  {/* 3 Status Action Buttons (Done, Postpone, Not Done) */}
-                  <div className="task-status-actions-bar">
-                    {!isDone && (
-                      <button
-                        onClick={() => handleMarkDone(task.id)}
-                        className="btn-status-action btn-act-done"
-                        title="Mark Done"
-                      >
-                        <FontAwesomeIcon icon={faCheckCircle} />
-                        <span>Done</span>
-                      </button>
-                    )}
-
-                    {isDone && (
-                      <button
-                        onClick={() => handleMarkNotDone(task.id)}
-                        className="btn-status-action btn-act-not-done"
-                        title="Mark Not Done"
-                      >
-                        <FontAwesomeIcon icon={faTimesCircle} />
-                        <span>Reopen</span>
-                      </button>
-                    )}
-
-                    {!isDone && (
-                      <button
-                        onClick={() => handleOpenPostpone(task.id, task.dueDate)}
-                        className="btn-status-action btn-act-postpone"
-                        title="Postpone Task to new date"
-                      >
-                        <FontAwesomeIcon icon={faClock} />
-                        <span>Postpone</span>
-                      </button>
-                    )}
-
-                    {!isDone && !isOverdueNotDone && (
-                      <button
-                        onClick={() => handleMarkNotDone(task.id)}
-                        className="btn-status-action btn-act-not-done"
-                        title="Mark Not Done"
-                      >
-                        <FontAwesomeIcon icon={faTimesCircle} />
-                        <span>Not Done</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Inline Postpone Date Selector Popover */}
-                  {postponeTaskId === task.id && (
-                    <div className="postpone-popover-box">
-                      <label>Reschedule To:</label>
-                      <input
-                        type="date"
-                        value={postponeDate}
-                        onChange={(e) => setPostponeDate(e.target.value)}
-                        min={todayStr}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleConfirmPostpone(task.id)}
-                        className="btn-confirm-postpone"
-                      >
-                        <FontAwesomeIcon icon={faCalendarAlt} /> Confirm
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPostponeTaskId(null)}
-                        className="btn-cancel-postpone"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
-                </div>
+                ))}
               </div>
-            );
-          })
-        )}
+            )}
+          </div>
+        </div>
+
+        {/* Right Pane: Assigned Work Tasks & To-Do List */}
+        <div className="tasks-pane">
+          <div className="tasks-pane-header">
+            <h4>
+              <FontAwesomeIcon icon={faListCheck} className="pane-icon" />
+              <span>Work Tasks</span>
+              <span className="pane-count-badge">{filteredTasks.length}</span>
+            </h4>
+          </div>
+
+          {/* Filter Segmented Control Bar */}
+          <div className="todo-filter-tabs">
+            <div className="tabs-group">
+              <button
+                className={`filter-tab ${activeFilter === "all" ? "active-tab" : ""}`}
+                onClick={() => setActiveFilter("all")}
+              >
+                All ({tasks.length})
+              </button>
+              <button
+                className={`filter-tab ${activeFilter === "today" ? "active-tab" : ""}`}
+                onClick={() => setActiveFilter("today")}
+              >
+                Today / Action
+              </button>
+              <button
+                className={`filter-tab tab-green ${activeFilter === "done" ? "active-tab-green" : ""}`}
+                onClick={() => setActiveFilter("done")}
+              >
+                Done ({doneCount})
+              </button>
+              <button
+                className={`filter-tab tab-red ${activeFilter === "not_done" ? "active-tab-red" : ""}`}
+                onClick={() => setActiveFilter("not_done")}
+              >
+                Not Done ({notDoneCount})
+              </button>
+              <button
+                className={`filter-tab tab-amber ${activeFilter === "postponed" ? "active-tab-amber" : ""}`}
+                onClick={() => setActiveFilter("postponed")}
+              >
+                Postponed ({postponedCount})
+              </button>
+            </div>
+          </div>
+
+          <div className="todo-items-list">
+            {filteredTasks.length === 0 ? (
+              <div className="empty-tasks-state">
+                <FontAwesomeIcon icon={faCalendarDay} className="empty-icon" />
+                <p>No tasks found for this view.</p>
+              </div>
+            ) : (
+              filteredTasks.map((task) => {
+                const prioLower = (task.priority || "medium").toLowerCase();
+                const isOverdueNotDone = (task.originalDueDate && task.originalDueDate < todayStr && task.status !== "done" && task.status !== "postponed") || task.status === "not_done";
+                const isPostponed = task.status === "postponed";
+                const isDone = task.status === "done";
+
+                return (
+                  <div
+                    key={task.id}
+                    className={`todo-item-card status-${task.status} prio-border-${prioLower}`}
+                  >
+                    <div className="todo-item-main-row">
+                      <div className="task-body-content">
+                        {/* Task Title & Lead Tag Row */}
+                        <div className="task-header-line">
+                          <span className={`task-title ${isDone ? "strike-through" : ""}`}>
+                            {task.title}
+                          </span>
+                          {task.associatedLead && (
+                            <span className="task-associated-lead-inline">
+                              <FontAwesomeIcon icon={faBuilding} className="lead-tag-icon" />
+                              <span>{task.associatedLead}</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Optional Description (rendered clean and inline) */}
+                        {task.description && (
+                          <div className="task-description-inline">
+                            <span>{task.description}</span>
+                          </div>
+                        )}
+
+                        {/* Metadata Row: Status, Overdue Warning, Priority, Category, Date */}
+                        <div className="task-meta-tags">
+                          {isDone ? (
+                            <span className="status-pill pill-done">
+                              <FontAwesomeIcon icon={faCheckCircle} /> Done
+                            </span>
+                          ) : isOverdueNotDone ? (
+                            <span className="status-pill pill-not-done">
+                              <FontAwesomeIcon icon={faTimesCircle} /> Not Done
+                            </span>
+                          ) : isPostponed ? (
+                            <span className="status-pill pill-postponed">
+                              <FontAwesomeIcon icon={faClock} /> Postponed
+                            </span>
+                          ) : (
+                            <span className="status-pill pill-pending">Pending</span>
+                          )}
+
+                          {isOverdueNotDone && !isDone && (
+                            <span className="status-pill pill-overdue" title={`Original due date was ${task.originalDueDate || task.dueDate}`}>
+                              <FontAwesomeIcon icon={faHistory} /> Carried Forward
+                            </span>
+                          )}
+
+                          <span className={`priority-tag tag-${prioLower}`}>
+                            {task.priority === "High" && <FontAwesomeIcon icon={faExclamationCircle} className="prio-icon" />}
+                            {task.priority}
+                          </span>
+                          <span className="category-tag">{task.category || "General"}</span>
+                          <span className="due-date-tag">
+                            <FontAwesomeIcon icon={faCalendarDay} className="cal-icon" /> {task.dueDate}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons Side Panel (circular icon buttons) */}
+                      <div className="task-actions-side">
+                        {!isDone && (
+                          <button
+                            onClick={() => handleMarkDone(task.id)}
+                            className="btn-action-round btn-round-done"
+                            title="Mark Done"
+                            aria-label="Mark Done"
+                          >
+                            <FontAwesomeIcon icon={faCheckCircle} />
+                          </button>
+                        )}
+
+                        {isDone && (
+                          <button
+                            onClick={() => handleMarkNotDone(task.id)}
+                            className="btn-action-round btn-round-reopen"
+                            title="Reopen Task"
+                            aria-label="Reopen Task"
+                          >
+                            <FontAwesomeIcon icon={faTimesCircle} />
+                          </button>
+                        )}
+
+                        {!isDone && (
+                          <button
+                            onClick={() => handleOpenPostpone(task.id, task.dueDate)}
+                            className="btn-action-round btn-round-postpone"
+                            title="Postpone Task"
+                            aria-label="Postpone Task"
+                          >
+                            <FontAwesomeIcon icon={faClock} />
+                          </button>
+                        )}
+
+                        {!isDone && !isOverdueNotDone && (
+                          <button
+                            onClick={() => handleMarkNotDone(task.id)}
+                            className="btn-action-round btn-round-not-done"
+                            title="Mark Not Done"
+                            aria-label="Mark Not Done"
+                          >
+                            <FontAwesomeIcon icon={faTimesCircle} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Inline Postpone Date Selector Popover (takes full width below the main row) */}
+                    {postponeTaskId === task.id && (
+                      <div className="postpone-popover-box">
+                        <label>Reschedule To:</label>
+                        <input
+                          type="date"
+                          value={postponeDate}
+                          onChange={(e) => setPostponeDate(e.target.value)}
+                          min={todayStr}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmPostpone(task.id)}
+                          className="btn-confirm-postpone"
+                        >
+                          <FontAwesomeIcon icon={faCalendarAlt} /> Confirm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPostponeTaskId(null)}
+                          className="btn-cancel-postpone"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
       </div>
+      {localSelectedLead && (
+        <LeadDetails
+          leadNumber={localSelectedLead}
+          onClose={() => {
+            setLocalSelectedLead(null);
+            fetchLeadsForSelection();
+          }}
+          onUpdate={() => {
+            setLocalSelectedLead(null);
+            fetchLeadsForSelection();
+          }}
+        />
+      )}
     </div>
   );
 }

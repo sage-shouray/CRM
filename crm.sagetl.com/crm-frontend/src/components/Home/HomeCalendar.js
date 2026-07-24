@@ -154,26 +154,25 @@ function HomeCalendar({ events = [], selectedDate, onSelectDate }) {
               </div>
 
               {hasEvents && (
-                <div className="day-event-indicators">
+                <div className="day-event-indicators-horizontal">
                   {dayEvents.followups > 0 && (
-                    <span className="event-pill followup-pill" title={`${dayEvents.followups} Lead Follow-up(s)`}>
-                      <FontAwesomeIcon icon={faBell} className="pill-icon" />
+                    <span className="event-badge badge-followup" title={`${dayEvents.followups} Lead Follow-up(s)`}>
                       {dayEvents.followups}
                     </span>
                   )}
-                  {dayEvents.tasksDone > 0 && (
-                    <span className="event-pill done-pill" title={`${dayEvents.tasksDone} Done Task(s)`}>
-                      ✓ {dayEvents.tasksDone} Done
+                  {dayEvents.tasksPending > 0 && (
+                    <span className="event-badge badge-pending" title={`${dayEvents.tasksPending} Pending Task(s)`}>
+                      {dayEvents.tasksPending}
                     </span>
                   )}
                   {dayEvents.tasksNotDone > 0 && (
-                    <span className="event-pill not-done-pill" title={`${dayEvents.tasksNotDone} Not Done Task(s)`}>
-                      ✗ {dayEvents.tasksNotDone} Not Done
+                    <span className="event-badge badge-not-done" title={`${dayEvents.tasksNotDone} Overdue Task(s)`}>
+                      {dayEvents.tasksNotDone}
                     </span>
                   )}
-                  {dayEvents.tasksPending > 0 && (
-                    <span className="event-pill pending-pill" title={`${dayEvents.tasksPending} Pending Task(s)`}>
-                      {dayEvents.tasksPending} Work
+                  {dayEvents.tasksDone > 0 && (
+                    <span className="event-badge badge-done" title={`${dayEvents.tasksDone} Done Task(s)`}>
+                      {dayEvents.tasksDone}
                     </span>
                   )}
                 </div>

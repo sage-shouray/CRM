@@ -8,6 +8,7 @@ const bcrypt = require("bcrypt");
 
 const Lead = require("./Models/createLeads");
 const User = require("./Models/User");
+const Task = require("./Models/Task");
 
 const AuthRouter = require("./Routes/AuthRouter");
 const OptionsRouter = require("./Routes/OptionsRouter");
@@ -334,6 +335,95 @@ app.get(
   }
 );
 
+// GET all tasks for logged-in user (or subordinates if supervisor/admin)
+app.get("/api/tasks", authenticateToken, async (req, res) => {
+  try {
+    const rawUserId = req.user?._id || req.user?.id;
+    const userRole = (req.user?.role || "").toLowerCase();
+    const userId = Number(rawUserId);
+
+    let query = {};
+    if (userRole === "admin") {
+      query = {};
+    } else if (userRole === "supervisor") {
+      const subusers = await User.find({ supervisor: userId });
+      const subuserIds = subusers.map(u => Number(u._id || u.id)).filter(id => !isNaN(id));
+      query = {
+        user_id: { $in: [userId, ...subuserIds] }
+      };
+    } else {
+      query = {
+        user_id: userId
+      };
+    }
+
+    const tasks = await Task.find(query);
+    res.json(tasks);
+  } catch (error) {
+    console.error("Error fetching tasks:", error);
+    res.status(500).json({ error: "Error fetching tasks", details: error.message });
+  }
+});
+
+// POST a new task
+app.post("/api/tasks", authenticateToken, async (req, res) => {
+  try {
+    const rawUserId = req.user?._id || req.user?.id;
+    const userId = Number(rawUserId);
+    const { taskId, title, associatedLead, description, originalDueDate, dueDate, priority, category, status } = req.body;
+
+    const newTask = await Task.create({
+      taskId: taskId || "task-" + Date.now(),
+      title,
+      associatedLead,
+      description,
+      originalDueDate,
+      dueDate,
+      priority,
+      category,
+      status: status || "pending",
+      userId
+    });
+
+    res.status(201).json(newTask);
+  } catch (error) {
+    console.error("Error creating task:", error);
+    res.status(500).json({ error: "Error creating task", details: error.message });
+  }
+});
+
+// PUT (update) an existing task by taskId or database id
+app.put("/api/tasks/:taskId", authenticateToken, async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    let task;
+    if (!isNaN(Number(taskId))) {
+      task = await Task.findOne({ id: Number(taskId) });
+    }
+    if (!task) {
+      task = await Task.findOne({ taskId });
+    }
+    if (!task) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    if (req.body.title !== undefined) task.title = req.body.title;
+    if (req.body.associatedLead !== undefined) task.associatedLead = req.body.associatedLead;
+    if (req.body.description !== undefined) task.description = req.body.description;
+    if (req.body.originalDueDate !== undefined) task.originalDueDate = req.body.originalDueDate;
+    if (req.body.dueDate !== undefined) task.dueDate = req.body.dueDate;
+    if (req.body.priority !== undefined) task.priority = req.body.priority;
+    if (req.body.status !== undefined) task.status = req.body.status;
+    if (req.body.category !== undefined) task.category = req.body.category;
+
+    const saved = await task.save();
+    res.json(saved);
+  } catch (error) {
+    console.error("Error updating task:", error);
+    res.status(500).json({ error: "Error updating task", details: error.message });
+  }
+});
+
 app.put("/api/leads/assign-bulk", authenticateToken, async (req, res) => {
   const { leadIds, assignedUserId } = req.body;
 
@@ -566,6 +656,7 @@ app.get("/api/users", async (req, res) => {
       email: 1,
       role: 1,
       status: 1,
+      designation: 1,
     }).populate("supervisor", "firstName lastName");
 
     res.json(users);

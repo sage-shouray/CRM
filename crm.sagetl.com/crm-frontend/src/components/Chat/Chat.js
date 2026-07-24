@@ -183,7 +183,7 @@ const Chat = () => {
       setGroupName("");
       setGroupDesc("");
       setSelectedMemberIds([]);
-      
+
       // Auto-select newly created group
       setSelectedChat({
         type: "group",

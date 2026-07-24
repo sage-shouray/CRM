@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { handleSuccess } from "../../utils";
 import { ToastContainer } from "react-toastify";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { 
-  faHouse, 
-  faRightFromBracket, 
+import {
+  faHouse,
+  faRightFromBracket,
   faFileExcel,
-  faComments
+  faComments,
+  faChevronDown
 } from "@fortawesome/free-solid-svg-icons";
 import Dropdown from "./Dropdown";
 import "./Header.css";
@@ -21,7 +22,7 @@ const headerButtonsByRole = {
     { name: "Lead", items: ["Create Leads"] },
     {
       name: "Lead Details",
-      items: ["Leads List", "Multiple Assign", "Unassigned Leads", "BI"],
+      items: ["Company Info", "Multiple Assign", "Unassigned Leads", "BI"],
     },
     { name: "Team", items: ["Overview"] },
     { name: "To-do", items: ["To-do List"] },
@@ -30,7 +31,7 @@ const headerButtonsByRole = {
   admin: [
     {
       name: "Leads",
-      items: ["Leads List", "Unassigned Leads"],
+      items: ["Company Info", "Unassigned Leads"],
     },
     { name: "To-do", items: ["To-do List"] },
     { name: "Team", items: ["Overview"] },
@@ -38,7 +39,7 @@ const headerButtonsByRole = {
     { name: "Account", items: ["My Profile", "Change Password"] },
   ],
   subuser: [
-    { name: "Lead", items: ["Create Leads", "Leads List"] },
+    { name: "Lead", items: ["Create Leads", "Company Info"] },
     { name: "To-do", items: ["To-do List"] },
     { name: "Account", items: ["My Profile", "Change Password"] },
   ],
@@ -49,6 +50,32 @@ function Header() {
   const [userRole, setUserRole] = useState("");
   const [openDropdown, setOpenDropdown] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = location.pathname;
+
+  const isHomeActive = currentPath === "/home" || currentPath === "/";
+  const isChatActive = currentPath === "/chat";
+
+  const isDropdownActive = (button) => {
+    const pathsByItem = {
+      "Create Leads": "/create-lead",
+      "Company Info": "/leads",
+      BI: "/bi",
+      "Unassigned Leads": "/unassigned-leads",
+      Overview: "/team-overview",
+      "To-do List": "/todo",
+      "User Management": "/user-management",
+      "Change Password": "/profile",
+      Profile: "/profile",
+      "My Profile": "/profile",
+      "Multiple Assign": "/multiple-assign",
+    };
+    return button.items.some(item => {
+      const path = pathsByItem[item];
+      if (!path) return false;
+      return currentPath.startsWith(path);
+    });
+  };
 
   useEffect(() => {
     setLoggedInUser(localStorage.getItem("loggedInUser") || "User");
@@ -118,29 +145,28 @@ function Header() {
       </div>
 
       <div
-        className={`main-header ${
-          userRole === "subuser"
+        className={`main-header ${userRole === "subuser"
             ? "subuser-header"
             : userRole === "admin"
-            ? "admin-header"
-            : userRole === "supervisor"
-            ? "supervisor-header"
-            : ""
-        }`}
+              ? "admin-header"
+              : userRole === "supervisor"
+                ? "supervisor-header"
+                : ""
+          }`}
       >
         <div className="header-buttons">
-          <button 
-            onClick={() => navigate("/home")} 
-            className="btn-home-shortcut"
+          <button
+            onClick={() => navigate("/home")}
+            className={`btn-home-shortcut ${isHomeActive ? "active" : ""}`}
             title="Dashboard Home"
           >
             <FontAwesomeIcon icon={faHouse} />
             <span>Home</span>
           </button>
 
-          <button 
-            onClick={() => navigate("/chat")} 
-            className="btn-home-shortcut btn-chat-shortcut"
+          <button
+            onClick={() => navigate("/chat")}
+            className={`btn-home-shortcut ${isChatActive ? "active" : ""}`}
             title="In-App Chat & Messages"
           >
             <FontAwesomeIcon icon={faComments} />
@@ -154,26 +180,54 @@ function Header() {
               items={button.items}
               isOpen={openDropdown === index}
               toggleDropdown={() => toggleDropdown(index)}
+              isActive={isDropdownActive(button)}
             />
           ))}
+
+          {userRole === "admin" && (
+            <div className={`dropdown ${openDropdown === "downloads" ? "open" : ""}`}>
+              <button
+                onClick={() => toggleDropdown("downloads")}
+                className="dropdown-trigger-btn"
+                title="Export Data"
+              >
+                <FontAwesomeIcon icon={faFileExcel} className="nav-cat-icon" />
+                <span>Downloads</span>
+                <FontAwesomeIcon icon={faChevronDown} className="dropdown-arrow" />
+              </button>
+              {openDropdown === "downloads" && (
+                <ul className="dropdown-menu">
+                  <li
+                    onClick={() => {
+                      downloadFile("leads");
+                      setOpenDropdown(null);
+                    }}
+                    className="dropdown-item"
+                    title="Export all leads to Excel"
+                  >
+                    <FontAwesomeIcon icon={faFileExcel} className="dropdown-item-icon" />
+                    <span>Leads XLSX</span>
+                  </li>
+                  <li
+                    onClick={() => {
+                      downloadFile("users");
+                      setOpenDropdown(null);
+                    }}
+                    className="dropdown-item"
+                    title="Export all users to Excel"
+                  >
+                    <FontAwesomeIcon icon={faFileExcel} className="dropdown-item-icon" />
+                    <span>Users XLSX</span>
+                  </li>
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
-        {userRole === "admin" && (
-          <div className="admin-download-buttons">
-            <button onClick={() => downloadFile("leads")} title="Export all leads to Excel">
-              <FontAwesomeIcon icon={faFileExcel} className="excel-icon" />
-              <span>Leads XLSX</span>
-            </button>
-            <button onClick={() => downloadFile("users")} title="Export all users to Excel">
-              <FontAwesomeIcon icon={faFileExcel} className="excel-icon" />
-              <span>Users XLSX</span>
-            </button>
-          </div>
-        )}
-
         <div className="user-info">
-          <div 
-            className="user-profile-trigger" 
+          <div
+            className="user-profile-trigger"
             onClick={() => navigate("/profile")}
             title="View Profile & Settings"
           >

@@ -4,28 +4,60 @@
     "email": "admin@sagetl.com",
     "password": "Admin@1234",
     "role": "admin",
+    "designation": "Super Admin",
     "userId": "ADM000"
   },
   {
-    "name": "Nishtha",
-    "email": "nichawla@sagetl.com",
+    "name": "Prashant AD",
+    "email": "prashant@sagetl.com",
     "password": "Sage123",
-    "role": "admin",
-    "userId": "ADM001"
-  },
-  {
-    "name": "Vaidehi Bhardwaj",
-    "email": "bhardwajvaidehi12@gmail.com",
-    "password": "vaidehi123",
     "role": "supervisor",
+    "designation": "AD",
     "userId": "SUP001"
   },
   {
-    "name": "Tejal Mahur",
-    "email": "tejalmahur16@gmail.com",
-    "password": "tejal123",
+    "name": "Anushka IS",
+    "email": "anushka@sagetl.com",
+    "password": "Sage123",
     "role": "subuser",
+    "designation": "IS",
     "userId": "SUB001",
-    "supervisorEmail": "bhardwajvaidehi12@gmail.com"
+    "supervisorEmail": "prashant@sagetl.com"
+  },
+  {
+    "name": "Kanishka IS",
+    "email": "kanishka@sagetl.com",
+    "password": "Sage123",
+    "role": "subuser",
+    "designation": "IS",
+    "userId": "SUB002",
+    "supervisorEmail": "prashant@sagetl.com"
+  },
+  {
+    "name": "Utkarsh BDM",
+    "email": "utkarsh@sagetl.com",
+    "password": "Sage123",
+    "role": "subuser",
+    "designation": "BDM",
+    "userId": "SUB003",
+    "supervisorEmail": "prashant@sagetl.com"
+  },
+  {
+    "name": "Vishal BDM",
+    "email": "vishal@sagetl.com",
+    "password": "Sage123",
+    "role": "subuser",
+    "designation": "BDM",
+    "userId": "SUB004",
+    "supervisorEmail": "prashant@sagetl.com"
+  },
+  {
+    "name": "Akash BDM",
+    "email": "akash@sagetl.com",
+    "password": "Sage123",
+    "role": "subuser",
+    "designation": "BDM",
+    "userId": "SUB005",
+    "supervisorEmail": "prashant@sagetl.com"
   }
 ]

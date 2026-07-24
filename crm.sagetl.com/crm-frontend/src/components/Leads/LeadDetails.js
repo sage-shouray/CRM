@@ -45,12 +45,16 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
           axios.get(`${API_BASE_URL}/api/options`),
           axios.get(`${API_BASE_URL}/api/users`),
         ]);
+        const allUsers = userNamesResponse.data || [];
+        const bdmNames = allUsers
+          .filter(user => (user.designation || "").toUpperCase() === "BDM")
+          .map(user => user.firstName);
         setOptions((prevOptions) => ({
           ...prevOptions,
           ...optionsResponse.data,
           leadTypeOptions: ["Net New", "SAP Installed Base"],
-          bdmOptions: userNamesResponse.data,
-          leadAssignedToOptions: userNamesResponse.data,
+          bdmOptions: bdmNames,
+          leadAssignedToOptions: allUsers,
         }));
       } catch (error) {
         console.error("Error fetching options", error);
@@ -147,30 +151,91 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
                   <label>{field.label}:</label>
 
                   {field.type === "select" ? (
-                    <select
-                      name={field.name}
-                      value={
-                        subSection
-                          ? editedLead?.[section]?.[subSection]?.[field.name] || ""
-                          : editedLead?.[section]?.[field.name] || ""
-                      }
-                      onChange={(e) =>
-                        handleInputChange(e, section, subSection)
-                      }
-                      disabled={!editMode}
-                      style={{ marginRight: "10px" }}
-                    >
-                      <option value="">Select {field.label}</option>
-                      {(options[field.options] || (field.name === "leadType" ? ["Net New", "SAP Installed Base"] : []))?.map((option, index) => (
-                        <option key={index} value={option._id || option}>
-                          {typeof option === "object" &&
-                          option.firstName &&
-                          option.lastName
-                            ? `${option.firstName} ${option.lastName}`
-                            : option}
-                        </option>
-                      ))}
-                    </select>
+                    <>
+                      <select
+                        name={field.name}
+                        value={
+                          field.name === "vertical" &&
+                          (subSection
+                            ? editedLead?.[section]?.[subSection]?.[field.name]
+                            : editedLead?.[section]?.[field.name]) &&
+                          options[field.options] &&
+                          !options[field.options].includes(
+                            subSection
+                              ? editedLead?.[section]?.[subSection]?.[field.name]
+                              : editedLead?.[section]?.[field.name]
+                          )
+                            ? "Others"
+                            : (() => {
+                                const rawVal = subSection
+                                  ? editedLead?.[section]?.[subSection]?.[field.name]
+                                  : editedLead?.[section]?.[field.name];
+                                return (rawVal && typeof rawVal === "object") ? (rawVal._id || rawVal.id || "") : (rawVal || "");
+                              })()
+                        }
+                        onChange={(e) => {
+                          if (field.name === "vertical" && e.target.value === "Others") {
+                            handleInputChange(
+                              { target: { name: field.name, value: "Others" } },
+                              section,
+                              subSection
+                            );
+                          } else {
+                            handleInputChange(e, section, subSection);
+                          }
+                        }}
+                        disabled={!editMode}
+                        style={{ marginRight: "10px" }}
+                      >
+                        <option value="" disabled>Select {field.label}</option>
+                        {(options[field.options] || (field.name === "leadType" ? ["Net New", "SAP Installed Base"] : []))?.map((option, index) => (
+                          <option key={index} value={option._id || option}>
+                            {typeof option === "object" &&
+                            option.firstName &&
+                            option.lastName
+                              ? `${option.firstName} ${option.lastName}`
+                              : option}
+                          </option>
+                        ))}
+                      </select>
+                      {field.name === "vertical" &&
+                        ((subSection
+                          ? editedLead?.[section]?.[subSection]?.[field.name] === "Others"
+                          : editedLead?.[section]?.[field.name] === "Others") ||
+                          ((subSection
+                            ? editedLead?.[section]?.[subSection]?.[field.name]
+                            : editedLead?.[section]?.[field.name]) &&
+                            options[field.options] &&
+                            !options[field.options].includes(
+                              subSection
+                                ? editedLead?.[section]?.[subSection]?.[field.name]
+                                : editedLead?.[section]?.[field.name]
+                            ))) && (
+                          <input
+                            type="text"
+                            name="verticalCustom"
+                            placeholder="Specify custom vertical..."
+                            value={
+                              (subSection
+                                ? editedLead?.[section]?.[subSection]?.[field.name]
+                                : editedLead?.[section]?.[field.name]) === "Others"
+                                  ? ""
+                                  : (subSection
+                                      ? editedLead?.[section]?.[subSection]?.[field.name]
+                                      : editedLead?.[section]?.[field.name])
+                            }
+                            onChange={(e) => {
+                              handleInputChange(
+                                { target: { name: field.name, value: e.target.value || "Others" } },
+                                section,
+                                subSection
+                              );
+                            }}
+                            disabled={!editMode}
+                            style={{ padding: "4px 8px", border: "1px solid #ccc", borderRadius: "4px" }}
+                          />
+                        )}
+                    </>
                   ) : (
                     <input
                       type={field.type}

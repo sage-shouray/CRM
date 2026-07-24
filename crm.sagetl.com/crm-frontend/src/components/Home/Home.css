@@ -1,25 +1,29 @@
 .home-dashboard-container.compact-dashboard {
-    padding: 24px;
+    padding: 8px 16px;
     max-width: 1400px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 8px;
     font-family: inherit;
     box-sizing: border-box;
+    height: calc(100vh - 56px);
+    overflow: hidden;
 }
 
 /* Modern Humanized Page Header */
 .dashboard-page-header {
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-radius: 12px;
-    padding: 20px 24px;
-    border: 1px solid #e4e4e7;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    padding: 6px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 20px;
+    gap: 12px;
     flex-wrap: wrap;
 }
 
@@ -55,17 +59,17 @@
 }
 
 .dashboard-welcome-heading {
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 800;
     color: #18181b;
-    margin: 2px 0 0 0;
-    letter-spacing: -0.4px;
+    margin: 1px 0 0 0;
+    letter-spacing: -0.3px;
 }
 
 .dashboard-description-text {
-    font-size: 13px;
+    font-size: 11.5px;
     color: #71717a;
-    margin: 2px 0 0 0;
+    margin: 1px 0 0 0;
 }
 
 .header-action-group {
@@ -120,11 +124,11 @@
     background: #ffffff;
     border: 1px solid #e4e4e7;
     border-radius: 12px;
-    padding: 18px 20px;
+    padding: 10px 16px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     text-align: left;
     transition: all var(--transition-fast);
 }
@@ -178,7 +182,7 @@
 }
 
 .stat-number {
-    font-size: 26px;
+    font-size: 20px;
     font-weight: 800;
     color: #18181b;
     letter-spacing: -0.5px;
@@ -189,16 +193,28 @@
     color: #a1a1aa;
 }
 
-/* 3-Column Single Screen Dashboard Grid */
+/* 2-Column Single Screen Dashboard Grid */
 .dashboard-three-column-grid {
     display: grid;
-    grid-template-columns: 1.05fr 1fr 1fr;
+    grid-template-columns: 1.25fr 2.05fr;
     gap: 20px;
     align-items: stretch;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .grid-col {
     min-width: 0;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.grid-col.col-calendar {
+    margin-left: 0;
 }
 
 /* Agenda Panel Card Styling */
@@ -206,13 +222,13 @@
     background: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    padding: 20px;
+    padding: 16px 20px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
     text-align: left;
-    height: 100%;
+    height: 500px;
     box-sizing: border-box;
     transition: box-shadow var(--transition-normal);
 }
@@ -315,12 +331,18 @@
 }
 
 .agenda-empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    padding: 45px 16px;
+    padding: 30px 16px;
     color: var(--slate-400);
     background: var(--slate-50);
     border: 1px dashed var(--slate-300);
     border-radius: var(--radius-sm);
+    box-sizing: border-box;
 }
 
 .empty-cal-icon {
@@ -346,7 +368,7 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
-    max-height: 350px;
+    flex: 1;
     overflow-y: auto;
     padding-right: 4px;
 }
@@ -486,27 +508,12 @@
 }
 
 /* Responsive Grid Breakpoints */
-@media (max-width: 1120px) {
-    .dashboard-three-column-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .grid-col.col-todo {
-        grid-column: span 2;
-    }
-}
-
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
     .dashboard-three-column-grid {
         grid-template-columns: 1fr;
     }
 
-    .grid-col.col-todo {
+    .grid-col.col-agenda-todo {
         grid-column: span 1;
-    }
-
-    .compact-top-banner {
-        flex-direction: column;
-        align-items: flex-start;
     }
 }

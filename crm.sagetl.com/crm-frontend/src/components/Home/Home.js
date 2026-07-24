@@ -91,7 +91,9 @@ function Home() {
   const calendarEvents = [];
 
   leads.forEach((lead) => {
-    const actionDate = lead.companyInfo?.nextActionDate 
+    const actionDate = lead.companyInfo?.dateField
+      ? lead.companyInfo.dateField.split("T")[0]
+      : lead.companyInfo?.nextActionDate 
       ? lead.companyInfo.nextActionDate.split("T")[0]
       : lead.createdAt 
       ? lead.createdAt.split("T")[0]
@@ -177,49 +179,9 @@ function Home() {
         </div>
       </div>
 
-      {/* Modern Clean Stat Cards Row */}
-      <div className="dashboard-metrics-row">
-        <div className="stat-card">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Follow-ups Today</span>
-            <div className="stat-icon-wrapper icon-orange">
-              <FontAwesomeIcon icon={faBell} />
-            </div>
-          </div>
-          <div className="stat-card-body">
-            <span className="stat-number">{followupsToday.length}</span>
-            <span className="stat-subtext">scheduled for {selectedDate === todayStr ? "today" : selectedDate}</span>
-          </div>
-        </div>
 
-        <div className="stat-card">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Pending Tasks</span>
-            <div className="stat-icon-wrapper icon-blue">
-              <FontAwesomeIcon icon={faTasks} />
-            </div>
-          </div>
-          <div className="stat-card-body">
-            <span className="stat-number">{tasksToday.length}</span>
-            <span className="stat-subtext">requiring action</span>
-          </div>
-        </div>
 
-        <div className="stat-card">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Active Pipeline Leads</span>
-            <div className="stat-icon-wrapper icon-emerald">
-              <FontAwesomeIcon icon={faChartLine} />
-            </div>
-          </div>
-          <div className="stat-card-body">
-            <span className="stat-number">{leads.length}</span>
-            <span className="stat-subtext">total visible leads</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3-Column Responsive Grid Layout */}
+      {/* 2-Column Responsive Grid Layout */}
       <div className="dashboard-three-column-grid">
         {/* Column 1: Interactive Calendar */}
         <div className="grid-col col-calendar">
@@ -230,114 +192,15 @@ function Home() {
           />
         </div>
 
-        {/* Column 2: Schedule Agenda & Reminders Panel */}
-        <div className="grid-col col-agenda">
-          <div className="agenda-card">
-            <div className="agenda-header">
-              <div className="agenda-title-box">
-                <FontAwesomeIcon icon={faBell} className="agenda-header-icon" />
-                <div>
-                  <h3>Schedule Agenda</h3>
-                  <p>{selectedDate === todayStr ? "Today's Schedule" : selectedDate} • {agendaEventsForSelectedDate.length} item(s)</p>
-                </div>
-              </div>
-              {selectedDate !== todayStr && (
-                <button
-                  onClick={() => setSelectedDate(todayStr)}
-                  className="btn-back-today"
-                  title="Jump to Today's Agenda"
-                >
-                  Return Today
-                </button>
-              )}
-            </div>
-
-            {selectedDate === todayStr && followupsToday.length > 0 && (
-              <div className="reminder-alert-banner">
-                <FontAwesomeIcon icon={faExclamationTriangle} className="alert-icon" />
-                <span>
-                  <strong>{followupsToday.length} lead follow-up(s)</strong> require action today!
-                </span>
-              </div>
-            )}
-
-            <div className="agenda-items-container">
-              {isLoadingLeads ? (
-                <div className="agenda-loading">
-                  <FontAwesomeIcon icon={faSpinner} spin className="spinner-icon" />
-                  <span>Fetching schedule items...</span>
-                </div>
-              ) : agendaEventsForSelectedDate.length === 0 ? (
-                <div className="agenda-empty-state">
-                  <FontAwesomeIcon icon={faCalendarCheck} className="empty-cal-icon" />
-                  <h4>No follow-ups scheduled</h4>
-                  <p>No lead follow-ups or work tasks on {selectedDate}. Pick another date on the calendar.</p>
-                </div>
-              ) : (
-                <div className="agenda-scroll-list">
-                  {selectedDateFollowups.length > 0 && (
-                    <div className="agenda-group">
-                      <h4 className="group-title">
-                        <FontAwesomeIcon icon={faBell} /> Lead Follow-ups ({selectedDateFollowups.length})
-                      </h4>
-                      {selectedDateFollowups.map((item) => (
-                        <div key={item.id} className="agenda-item-card followup-card">
-                          <div className="item-main-details">
-                            <div className="lead-name-row">
-                              <FontAwesomeIcon icon={faBuilding} className="building-icon" />
-                              <span className="lead-company-name">{item.companyName}</span>
-                              <span className={`priority-badge prio-${(item.priority || 'medium').toLowerCase()}`}>
-                                {item.priority}
-                              </span>
-                            </div>
-
-                            <div className="lead-sub-info">
-                              <span><FontAwesomeIcon icon={faClock} /> {item.nextAction}</span>
-                              <span><FontAwesomeIcon icon={faPhone} /> {item.phone}</span>
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() => handleOpenLead(item.leadNumber)}
-                            className="btn-view-lead"
-                            title="View Full Lead Profile"
-                          >
-                            <span>Details</span>
-                            <FontAwesomeIcon icon={faArrowRight} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {selectedDateTasks.length > 0 && (
-                    <div className="agenda-group">
-                      <h4 className="group-title">
-                        <FontAwesomeIcon icon={faTasks} /> Work Tasks ({selectedDateTasks.length})
-                      </h4>
-                      {selectedDateTasks.map((task) => (
-                        <div key={task.id} className="agenda-item-card task-card">
-                          <div className="item-main-details">
-                            <span className="task-item-title">{task.title}</span>
-                            <div className="lead-sub-info">
-                              <span className={`priority-badge prio-${(task.priority || 'medium').toLowerCase()}`}>
-                                {task.priority} Priority
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Column 3: Integrated To-Do List Widget */}
-        <div className="grid-col col-todo">
-          <HomeToDoWidget onTaskUpdate={setToDoTasks} />
+        {/* Column 2: Combined Schedule Agenda & To-Do List Widget */}
+        <div className="grid-col col-agenda-todo">
+          <HomeToDoWidget
+            onTaskUpdate={setToDoTasks}
+            selectedDate={selectedDate}
+            selectedDateFollowups={selectedDateFollowups}
+            isLoadingLeads={isLoadingLeads}
+            onOpenLead={handleOpenLead}
+          />
         </div>
       </div>
 

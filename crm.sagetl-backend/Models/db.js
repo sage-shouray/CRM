@@ -239,6 +239,9 @@ class OptionsModelInstance {
   constructor(data) {
     this.data = data;
   }
+  toJSON() {
+    return this.data;
+  }
   async save() {
     const countRes = await pool.query('SELECT COUNT(*) FROM options');
     if (parseInt(countRes.rows[0].count, 10) > 0) {
@@ -529,6 +532,120 @@ const Lead = {
   }
 };
 
+// Task Model Instance
+class TaskModelInstance {
+  constructor(data) {
+    Object.assign(this, data);
+  }
+  
+  async save() {
+    const dbFields = {
+      task_id: this.taskId,
+      title: this.title,
+      associated_lead: this.associatedLead,
+      description: this.description,
+      original_due_date: this.originalDueDate,
+      due_date: this.dueDate,
+      priority: this.priority,
+      status: this.status,
+      category: this.category,
+      user_id: this.userId ? Number(this.userId) : null
+    };
+    const keys = Object.keys(dbFields);
+    const values = Object.values(dbFields);
+    
+    if (this.id) {
+      const setClause = keys.map((k, idx) => `"${k}" = $${idx + 1}`).join(', ');
+      const query = `UPDATE tasks SET ${setClause} WHERE id = $${keys.length + 1} RETURNING *`;
+      const res = await pool.query(query, [...values, this.id]);
+      Object.assign(this, mapTask(res.rows[0]));
+      return this;
+    } else {
+      const placeholders = keys.map((_, idx) => `$${idx + 1}`).join(', ');
+      const query = `INSERT INTO tasks (${keys.map(k => `"${k}"`).join(', ')}) VALUES (${placeholders}) RETURNING *`;
+      const res = await pool.query(query, values);
+      Object.assign(this, mapTask(res.rows[0]));
+      return this;
+    }
+  }
+}
+
+function mapTask(row) {
+  if (!row) return null;
+  return {
+    _id: row.id,
+    id: row.id,
+    taskId: row.task_id,
+    title: row.title,
+    associatedLead: row.associated_lead,
+    description: row.description,
+    originalDueDate: row.original_due_date,
+    dueDate: row.due_date,
+    priority: row.priority,
+    status: row.status,
+    category: row.category,
+    userId: row.user_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+const Task = {
+  find: function(query) {
+    let queryBuilder = {
+      then: async function(resolve, reject) {
+        try {
+          const res = await this.exec();
+          resolve(res);
+        } catch (e) {
+          reject(e);
+        }
+      },
+      exec: async function() {
+        let conditions = [];
+        let values = [];
+        let pIndex = 1;
+        if (query && query.user_id) {
+          if (query.user_id.$in) {
+            conditions.push(`user_id IN (${query.user_id.$in.map(() => `$${pIndex++}`).join(', ')})`);
+            values.push(...query.user_id.$in);
+          } else {
+            conditions.push(`user_id = $${pIndex++}`);
+            values.push(query.user_id);
+          }
+        }
+        let where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+        let sql = `SELECT * FROM tasks ${where} ORDER BY id DESC`;
+        const res = await pool.query(sql, values);
+        return res.rows.map(mapTask).map(t => new TaskModelInstance(t));
+      }
+    };
+    queryBuilder.then = queryBuilder.then.bind(queryBuilder);
+    return queryBuilder;
+  },
+  findOne: async function(query) {
+    let conditions = [];
+    let values = [];
+    let pIndex = 1;
+    if (query && query.taskId) {
+      conditions.push(`task_id = $${pIndex++}`);
+      values.push(query.taskId);
+    }
+    if (query && query.id) {
+      conditions.push(`id = $${pIndex++}`);
+      values.push(Number(query.id));
+    }
+    let where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+    const res = await pool.query(`SELECT * FROM tasks ${where} LIMIT 1`, values);
+    if (res.rowCount === 0) return null;
+    return new TaskModelInstance(mapTask(res.rows[0]));
+  },
+  create: async function(data) {
+    const inst = new TaskModelInstance(data);
+    return await inst.save();
+  }
+};
+
 // Options Model query helpers
 const OptionsModel = {
   findOne: async function() {
@@ -630,6 +747,24 @@ async function initializeDB() {
       );
     `);
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id SERIAL PRIMARY KEY,
+        task_id VARCHAR(50) UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        associated_lead VARCHAR(255),
+        description TEXT,
+        original_due_date VARCHAR(20),
+        due_date VARCHAR(20),
+        priority VARCHAR(20),
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        category VARCHAR(50),
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log("PostgreSQL schema initialized successfully.");
 
     const usersCount = await pool.query('SELECT COUNT(*) FROM users');
@@ -644,7 +779,7 @@ async function initializeDB() {
         const nameParts = u.name.split(' ');
         const firstName = nameParts[0];
         const lastName = nameParts.slice(1).join(' ') || 'User';
-        const designation = u.role === 'admin' ? 'Super Admin' : (u.role === 'supervisor' ? 'Supervisor' : 'Subuser');
+        const designation = u.designation || (u.role === 'admin' ? 'Super Admin' : (u.role === 'supervisor' ? 'Supervisor' : 'Subuser'));
         const mobile = '1234567890';
         
         const insertRes = await pool.query(`
@@ -657,7 +792,7 @@ async function initializeDB() {
       }
 
       for (const u of usersData) {
-        if (u.role === 'subuser' && u.supervisorEmail) {
+        if (u.supervisorEmail) {
           const supervisorId = emailToId[u.supervisorEmail];
           if (supervisorId) {
             const subId = emailToId[u.email];
@@ -685,35 +820,88 @@ async function initializeDB() {
       console.log("Super Admin user 'admin@sagetl.com' password & role updated successfully.");
     }
 
+    const defaultOptions = {
+      leadTypeOptions: ["Hot", "Warm", "Cold"],
+      verticalOptions: [
+        "Auto / Auto Ancillary",
+        "Textile / Spinning / Garments / Footwear / Leather",
+        "Real Estate / Construction",
+        "EPC",
+        "Pharma / Equip. (Surgical) / Healthcare / Device Manufacturing",
+        "Chemicals / Process / Fertilizers",
+        "BFSI",
+        "Solar / Renewable / Power",
+        "Mobiles / Electronics",
+        "PSU's / QUASSI",
+        "E-commerce",
+        "FMCG",
+        "Dairy",
+        "Sugar / Ethanol / Distillery",
+        "Manufacturing / Discrete",
+        "Diversified / Conglomerate",
+        "Education",
+        "Logistics",
+        "Retail / Hypermart / Trading",
+        "Others"
+      ],
+      leadStatusOptions: [
+        "Cold (9+ months)",
+        "Warm (3–9 months)",
+        "Hot (0–3 months)",
+        "Duplicate",
+        "Junk",
+        "WON",
+        "LOST"
+      ],
+      priorityOptions: ["High", "Medium", "Low"],
+      leadSourceOptions: ["Reference", "Self Generated", "Existing Database"],
+      stateOptions: ["Maharashtra", "Delhi", "Karnataka"],
+      countryOptions: ["India", "USA", "UK"],
+      leadUsableOptions: ["Yes", "No"],
+      nextActionOptions: [
+        "Call Back",
+        "Online Meeting",
+        "On-Site Meeting",
+        "Proposal Submitted",
+        "Negotiation",
+        "Follow-Up"
+      ],
+      employeeCountOptions: ["1-10", "11-50", "51-200", "201+"],
+      reasonOptions: ["Interested", "Not interested"],
+      turnOverOptions: ["<10Cr", "10-50Cr", "50-100Cr", "100Cr+"],
+      usingERPOptions: ["Yes", "No"],
+      ERPTypeOptions: ["Microsoft", "Oracle", "Infor", "Epicor", "SAP B1", "SAP BYD", "Tally", "Industry Specific", "Other ERP"],
+      opportunityForUs3Options: [
+        "IMPL / RE-IMPL",
+        "AMS",
+        "Hardware Migration (H/W) / Version Upgrade",
+        "Rollouts",
+        "Resourcing",
+        "System Audit / DPR",
+        "SAP Licences",
+        "Basis / DMS",
+        "Custom Developments",
+        "Others"
+      ],
+      noWhyOptions: ["No budget", "Not needed"],
+      opportunityOptions: ["High", "Low"],
+      timeframeOptions: ["Immediate", "1-3 months", "3-6 months"],
+      currentDatabaseOptions: ["Oracle", "SQL Server", "MySQL", "PostgreSQL"],
+      expiryOptions: ["2026", "2027", "2028"],
+      versionOptions: ["v1", "v2"],
+      partnerOptions: ["Partner A", "Partner B"],
+      conversationLevelOptions: ["C-level", "Manager-level"]
+    };
+
     const optionsCount = await pool.query('SELECT COUNT(*) FROM options');
     if (parseInt(optionsCount.rows[0].count, 10) === 0) {
       console.log("Seeding default option values...");
-      const defaultOptions = {
-        leadTypeOptions: ["Hot", "Warm", "Cold"],
-        verticalOptions: ["Retail", "Manufacturing", "Finance", "Healthcare", "IT"],
-        leadStatusOptions: ["New", "Contacted", "Qualified", "Lost"],
-        priorityOptions: ["High", "Medium", "Low"],
-        leadSourceOptions: ["Web", "Referral", "Cold Call"],
-        stateOptions: ["Maharashtra", "Delhi", "Karnataka"],
-        countryOptions: ["India", "USA", "UK"],
-        leadUsableOptions: ["Yes", "No"],
-        nextActionOptions: ["Call", "Email", "Meeting"],
-        employeeCountOptions: ["1-10", "11-50", "51-200", "201+"],
-        reasonOptions: ["Interested", "Not interested"],
-        turnOverOptions: ["<10Cr", "10-50Cr", "50-100Cr", "100Cr+"],
-        usingERPOptions: ["Yes", "No"],
-        ERPTypeOptions: ["SAP", "Oracle", "Microsoft Dynamics", "None"],
-        noWhyOptions: ["No budget", "Not needed"],
-        opportunityOptions: ["High", "Low"],
-        timeframeOptions: ["Immediate", "1-3 months", "3-6 months"],
-        currentDatabaseOptions: ["Oracle", "SQL Server", "MySQL", "PostgreSQL"],
-        expiryOptions: ["2026", "2027", "2028"],
-        versionOptions: ["v1", "v2"],
-        partnerOptions: ["Partner A", "Partner B"],
-        conversationLevelOptions: ["C-level", "Manager-level"]
-      };
       await pool.query('INSERT INTO options (data) VALUES ($1)', [defaultOptions]);
       console.log("Option values seeded.");
+    } else {
+      console.log("Updating option values to ensure vertical options are fresh...");
+      await pool.query('UPDATE options SET data = $1', [defaultOptions]);
+      console.log("Option values updated.");
     }
   } catch (err) {
     console.error("Database initialization error:", err);
@@ -732,6 +920,11 @@ function LeadConstructor(data) {
 }
 Object.assign(LeadConstructor, Lead);
 
+function TaskConstructor(data) {
+  return new TaskModelInstance(data);
+}
+Object.assign(TaskConstructor, Task);
+
 module.exports = {
   connect: async () => {},
   connection: {
@@ -747,6 +940,7 @@ module.exports = {
   },
   User: UserConstructor,
   Lead: LeadConstructor,
+  Task: TaskConstructor,
   OptionsModel,
   pool,
   query: (text, params) => pool.query(text, params)

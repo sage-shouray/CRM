@@ -71,8 +71,7 @@ export const companyFormConfig = [
     {
       name: "reason",
       label: "Reason",
-      type: "select",
-      options: "reasonOptions",
+      type: "text",
     },
     { name: "address", label: "Address", type: "text" },
   ],
@@ -146,87 +145,66 @@ export const itLandscapeConfig = {
   netNew: [
     [
       {
-        name: "usingERP", // Changed from "Using ERP (y/n)" to "usingERP"
-        label: "Using ERP (y/n)",
+        name: "usingERP",
+        label: "Using ERP",
         type: "select",
         options: "usingERPOptions",
       },
-      { name: "budget", label: "Budget", type: "text" }, // Changed from "Budget" to "budget"
+      { name: "budget", label: "Budget", type: "text" },
       {
-        name: "opportunityForUs1", // Changed from "Opportunity for us 1" to "opportunityForUs1"
-        label: "Opportunity for us 1",
+        name: "opportunityForUs1",
+        label: "Opportunity",
         type: "select",
         options: "opportunityOptions",
       },
     ],
     [
+      { name: "authority", label: "Authority", type: "text" },
       {
-        name: "ifYesWhichOne", // Changed from "If yes, which one" to "ifYesWhichOne"
-        label: "If yes, which one",
-        type: "select",
-        options: "ERPTypeOptions",
+        name: "opportunityValue1",
+        label: "Opportunity Value",
+        type: "number",
       },
-      { name: "authority", label: "Authority", type: "text" }, // Changed from "Authority" to "authority"
-      {
-        name: "opportunityValue1", // Changed from "Opportunity Value 1" to "opportunityValue1"
-        label: "Opportunity Value 1",
-        type: "text",
-      },
+      { name: "need", label: "Need", type: "text" },
     ],
     [
       {
-        name: "ifNoWhy", // Changed from "If no, why" to "ifNoWhy"
-        label: "If no, why",
-        type: "select",
-        options: "noWhyOptions",
-      },
-      { name: "need", label: "Need", type: "text" }, // Changed from "Need" to "need"
-      {
-        name: "timeframe", // Changed from "Timeframe" to "timeframe"
+        name: "timeframe",
         label: "Timeframe",
         type: "select",
         options: "timeframeOptions",
-      },
-    ],
-    [
-      { name: "hardware", label: "Hardware", type: "text" }, // Changed from "Hardware" to "hardware"
-      {
-        name: "currentDatabase", // Changed from "Current Database" to "currentDatabase"
-        label: "Current Database",
-        type: "select",
-        options: "currentDatabaseOptions",
       },
     ],
   ],
   SAPInstalledBase: [
     [
       {
-        name: "opportunityForUs2", // Changed from "Opportunity for us 2" to "opportunityForUs2"
-        label: "Opportunity for us 2",
+        name: "opportunityForUs2",
+        label: "Opportunity for us available",
         type: "select",
         options: "opportunityOptions",
       },
       {
-        name: "yearOfImplementation", // Changed from "Year of Implementation" to "yearOfImplementation"
+        name: "yearOfImplementation",
         label: "Year of Implementation",
         type: "text",
       },
-      { name: "noOfUsers", label: "No. of Users", type: "number" }, // Changed from "No. of Users" to "noOfUsers"
+      { name: "noOfUsers", label: "No. of Users", type: "number" },
     ],
     [
       {
-        name: "opportunityValue2", // Changed from "Opportunity Value 2" to "opportunityValue2"
-        label: "Opportunity Value 2",
-        type: "text",
+        name: "opportunityValue2",
+        label: "Opportunity Value",
+        type: "number",
       },
       {
-        name: "contractExpiry", // Changed from "Contract Expiry" to "contractExpiry"
+        name: "contractExpiry",
         label: "Contract Expiry",
         type: "select",
         options: "expiryOptions",
       },
       {
-        name: "supportPartner", // Changed from "" to "supportPartner"
+        name: "supportPartner",
         label: "Support Partner",
         type: "select",
         options: "partnerOptions",
@@ -234,41 +212,36 @@ export const itLandscapeConfig = {
     ],
     [
       {
-        name: "opportunityForUs3", // Changed from "Opportunity for us 3" to "opportunityForUs3"
-        label: "Opportunity for us 3",
+        name: "opportunityForUs3",
+        label: "Opportunity for",
         type: "select",
-        options: "opportunityOptions",
+        options: "opportunityForUs3Options",
       },
       {
-        name: "exactVersion", // Changed from "Exact Version" to "exactVersion"
+        name: "exactVersion",
         label: "Exact Version",
         type: "select",
         options: "versionOptions",
       },
-      { name: "hardware", label: "Hardware", type: "text" }, // Remains unchanged
+      { name: "hardware", label: "Hardware", type: "text" },
+    ],
+    [
+      { name: "noOfLicense", label: "No. of License", type: "number" },
+      { name: "licenseValue", label: "License Value", type: "text" },
     ],
     [
       {
-        name: "opportunityValue3", // Changed from "Opportunity Value 3" to "opportunityValue3"
-        label: "Opportunity Value 3",
-        type: "text",
-      },
-      { name: "noOfLicense", label: "No. of License", type: "number" }, // Changed from "No. of License" to "noOfLicense"
-      { name: "licenseValue", label: "License Value", type: "text" }, // Changed from "License Value" to "licenseValue"
-    ],
-    [
-      {
-        name: "modulesImplemented", // Changed from "Modules Implemented" to "modulesImplemented"
+        name: "modulesImplemented",
         label: "Modules Implemented",
         type: "text",
       },
       {
-        name: "implementationPartner", // Changed from "Implementation Partner" to "implementationPartner"
+        name: "implementationPartner",
         label: "Implementation Partner",
         type: "text",
       },
       {
-        name: "totalProjectCost", // Changed from "Total Project Cost" to "totalProjectCost"
+        name: "totalProjectCost",
         label: "Total Project Cost",
         type: "text",
       },
