@@ -102,6 +102,37 @@
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
 }
 
+/* Chat nav button — unread badge + blink */
+.chat-nav-btn {
+    position: relative;
+}
+
+.nav-unread-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 18px;
+    text-align: center;
+    box-shadow: 0 0 0 2px #fff;
+}
+
+.chat-nav-btn.has-unread {
+    animation: chat-nav-blink 1.1s ease-in-out infinite;
+}
+
+@keyframes chat-nav-blink {
+    0%, 100% { color: #292524; }
+    50% { color: #ef4444; }
+}
+
 .dropdown.active-dropdown .dropdown-trigger-btn {
     background-color: rgba(255, 255, 255, 0.45);
     border-color: rgba(255, 255, 255, 0.65);

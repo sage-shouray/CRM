@@ -3,9 +3,16 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcrypt');
+const { ROLE_LABELS, ROLES } = require('../Middleware/roles');
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/crm';
 const pool = new Pool({ connectionString });
+
+// Build a parameter placeholder list ($1, $2, ...) for a values array,
+// so IN (...) clauses are always parameterized instead of string-interpolated.
+function inPlaceholders(arr, startIndex = 1) {
+  return arr.map((_, i) => `$${startIndex + i}`).join(', ');
+}
 
 // Helper to convert MongoDB-style queries to PostgreSQL WHERE clauses
 function buildWhereClause(query, startParamIndex = 1) {
@@ -52,11 +59,16 @@ function buildWhereClause(query, startParamIndex = 1) {
         }
       }
       col = jsonPath;
+    } else if (col === 'supervisor') {
+      // The only column whose name is not just the snake_case of the field.
+      col = 'supervisor_id';
     } else {
-      if (col === 'firstName') col = 'first_name';
-      else if (col === 'lastName') col = 'last_name';
-      else if (col === 'supervisor') col = 'supervisor_id';
-      else if (col === 'createdBy') col = 'created_by';
+      // Every other column is the snake_case form of the model field
+      // (leadNumber -> lead_number, createdBy -> created_by, ...). Doing this
+      // generically means a field is never passed through as-is and silently
+      // sent to Postgres as an unquoted identifier it will fold to lowercase
+      // and fail to resolve.
+      col = col.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
     }
 
     if (value === null || value === undefined) {
@@ -116,6 +128,16 @@ function mapUser(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+// A user as it may be embedded in another record via .populate(). Populated
+// relations are serialised straight into API responses, so the password hash
+// must never travel with them.
+function mapPublicUser(row) {
+  const user = mapUser(row);
+  if (!user) return null;
+  delete user.password;
+  return user;
 }
 
 // Map CamelCase User object to database columns
@@ -201,7 +223,7 @@ class LeadModelInstance {
     
     if (this.id) {
       const setClause = keys.map((k, idx) => `"${k}" = $${idx + 1}`).join(', ');
-      const query = `UPDATE leads SET ${setClause} WHERE id = $${keys.length + 1} RETURNING *`;
+      const query = `UPDATE leads SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1} RETURNING *`;
       const res = await pool.query(query, [...values, this.id]);
       Object.assign(this, mapLead(res.rows[0]));
       return this;
@@ -218,9 +240,9 @@ class LeadModelInstance {
     if (path === 'descriptions.addedBy' && this.descriptions) {
       const userIds = [...new Set(this.descriptions.map(d => d.addedBy).filter(Boolean))];
       if (userIds.length > 0) {
-        const uRes = await pool.query(`SELECT * FROM users WHERE id IN (${userIds.join(',')})`);
+        const uRes = await pool.query(`SELECT * FROM users WHERE id IN (${inPlaceholders(userIds)})`, userIds);
         const uMap = {};
-        uRes.rows.map(mapUser).forEach(u => {
+        uRes.rows.map(mapPublicUser).forEach(u => {
           uMap[u.id] = u;
         });
         this.descriptions.forEach(d => {
@@ -296,7 +318,12 @@ const User = {
         const res = await pool.query(sql, values);
         let items = res.rows.map(mapUser).map(u => {
           const inst = new UserModelInstance(u);
-          if (projection === '-password' || (projection && (projection.password === 0 || projection.password === false))) {
+          // Exclude the password hash unless a caller explicitly asks for it.
+          // An inclusion projection like { firstName: 1, role: 1 } previously
+          // fell through this check and shipped the hash to the browser.
+          const wantsPassword =
+            projection && (projection.password === 1 || projection.password === true);
+          if (!wantsPassword) {
             delete inst.password;
           }
           return inst;
@@ -306,9 +333,9 @@ const User = {
           if (pop.path === 'supervisor') {
             const supervisorIds = [...new Set(items.map(u => u.supervisor).filter(Boolean))];
             if (supervisorIds.length > 0) {
-              const supRes = await pool.query(`SELECT * FROM users WHERE id IN (${supervisorIds.join(',')})`);
+              const supRes = await pool.query(`SELECT * FROM users WHERE id IN (${inPlaceholders(supervisorIds)})`, supervisorIds);
               const supMap = {};
-              supRes.rows.map(mapUser).forEach(s => {
+              supRes.rows.map(mapPublicUser).forEach(s => {
                 supMap[s.id] = s;
               });
               items.forEach(u => {
@@ -402,9 +429,9 @@ const Lead = {
           if (pop.path === 'createdBy') {
             const userIds = [...new Set(items.map(l => l.createdBy).filter(Boolean))];
             if (userIds.length > 0) {
-              const uRes = await pool.query(`SELECT * FROM users WHERE id IN (${userIds.join(',')})`);
+              const uRes = await pool.query(`SELECT * FROM users WHERE id IN (${inPlaceholders(userIds)})`, userIds);
               const uMap = {};
-              uRes.rows.map(mapUser).forEach(u => {
+              uRes.rows.map(mapPublicUser).forEach(u => {
                 uMap[u.id] = u;
               });
               items.forEach(l => {
@@ -416,9 +443,9 @@ const Lead = {
           } else if (pop.path === 'companyInfo.leadAssignedTo') {
             const userIds = [...new Set(items.map(l => l.companyInfo.leadAssignedTo).filter(id => id && !isNaN(id)))];
             if (userIds.length > 0) {
-              const uRes = await pool.query(`SELECT * FROM users WHERE id IN (${userIds.join(',')})`);
+              const uRes = await pool.query(`SELECT * FROM users WHERE id IN (${inPlaceholders(userIds)})`, userIds);
               const uMap = {};
-              uRes.rows.map(mapUser).forEach(u => {
+              uRes.rows.map(mapPublicUser).forEach(u => {
                 uMap[u.id] = u;
               });
               items.forEach(l => {
@@ -439,9 +466,9 @@ const Lead = {
             });
             const uniqueUserIds = [...new Set(userIds.filter(Boolean))];
             if (uniqueUserIds.length > 0) {
-              const uRes = await pool.query(`SELECT * FROM users WHERE id IN (${uniqueUserIds.join(',')})`);
+              const uRes = await pool.query(`SELECT * FROM users WHERE id IN (${inPlaceholders(uniqueUserIds)})`, uniqueUserIds);
               const uMap = {};
-              uRes.rows.map(mapUser).forEach(u => {
+              uRes.rows.map(mapPublicUser).forEach(u => {
                 uMap[u.id] = u;
               });
               items.forEach(l => {
@@ -488,13 +515,13 @@ const Lead = {
         for (const pop of this._populates) {
           if (pop.path === 'createdBy' && item.createdBy) {
             const uRes = await pool.query('SELECT * FROM users WHERE id = $1', [item.createdBy]);
-            if (uRes.rowCount > 0) item.createdBy = mapUser(uRes.rows[0]);
+            if (uRes.rowCount > 0) item.createdBy = mapPublicUser(uRes.rows[0]);
           } else if (pop.path === 'descriptions.addedBy' && item.descriptions) {
             const userIds = [...new Set(item.descriptions.map(d => d.addedBy).filter(Boolean))];
             if (userIds.length > 0) {
-              const uRes = await pool.query(`SELECT * FROM users WHERE id IN (${userIds.join(',')})`);
+              const uRes = await pool.query(`SELECT * FROM users WHERE id IN (${inPlaceholders(userIds)})`, userIds);
               const uMap = {};
-              uRes.rows.map(mapUser).forEach(u => {
+              uRes.rows.map(mapPublicUser).forEach(u => {
                 uMap[u.id] = u;
               });
               item.descriptions.forEach(d => {
@@ -662,6 +689,27 @@ const OptionsModel = {
   }
 };
 
+// Every user id at or below `userId` in the reporting tree: the user, the
+// people whose supervisor is them, the people below those, and so on.
+//
+// This is what scopes an Admin to its own BDMs and their Business Leads, and a
+// BDM to its own Business Leads. UNION (not UNION ALL) so a mis-configured
+// cycle in supervisor_id terminates instead of spinning forever.
+async function getDescendantUserIds(userId) {
+  const id = Number(userId);
+  if (!id || Number.isNaN(id)) return [];
+  const res = await pool.query(
+    `WITH RECURSIVE subtree AS (
+       SELECT id FROM users WHERE id = $1
+       UNION
+       SELECT u.id FROM users u JOIN subtree s ON u.supervisor_id = s.id
+     )
+     SELECT id FROM subtree`,
+    [id]
+  );
+  return res.rows.map((r) => r.id);
+}
+
 // Startup table creation & user seeding
 async function initializeDB() {
   const baseUri = connectionString.replace(/\/([^/]+)$/, '/postgres');
@@ -765,6 +813,77 @@ async function initializeDB() {
       );
     `);
 
+    // Applied-migration ledger, so one-shot data changes stay one-shot.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        key VARCHAR(100) PRIMARY KEY,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Three-tier roles (admin / supervisor / subuser) -> four-tier
+    // (superadmin / admin / bdm / businesslead).
+    //
+    // This MUST run exactly once. The old top tier was called "admin", and
+    // that name still exists as the new second tier, so re-running it would
+    // promote every Admin to Super Admin. The ledger check is the guard.
+    const rolesMigrated = await pool.query(
+      'SELECT 1 FROM schema_migrations WHERE key = $1',
+      ['roles_v2_four_tier']
+    );
+    if (rolesMigrated.rowCount === 0) {
+      // Order matters: retire the old "admin" meaning before anything else.
+      const promoted = await pool.query(
+        `UPDATE users SET role = 'superadmin' WHERE role = 'admin'`
+      );
+      const bdms = await pool.query(
+        `UPDATE users SET role = 'bdm' WHERE role = 'supervisor'`
+      );
+      const leads = await pool.query(
+        `UPDATE users SET role = 'businesslead' WHERE role = 'subuser'`
+      );
+      await pool.query(
+        'INSERT INTO schema_migrations (key) VALUES ($1)',
+        ['roles_v2_four_tier']
+      );
+      console.log(
+        `Role migration applied: ${promoted.rowCount} -> superadmin, ` +
+        `${bdms.rowCount} -> bdm, ${leads.rowCount} -> businesslead.`
+      );
+    }
+
+    // Reject unknown roles at the database level. Kept in its own try/catch so
+    // an unexpected legacy value cannot abort the rest of startup.
+    try {
+      await pool.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'users_role_valid'
+          ) THEN
+            ALTER TABLE users ADD CONSTRAINT users_role_valid
+              CHECK (role IN ('superadmin', 'admin', 'bdm', 'businesslead'));
+          END IF;
+        END $$;
+      `);
+    } catch (constraintErr) {
+      console.error(
+        "Could not add users_role_valid constraint (unexpected role values?):",
+        constraintErr.message
+      );
+    }
+
+    // Indexes on hot query paths (idempotent).
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_supervisor_id ON users(supervisor_id);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_leads_created_by ON leads(created_by);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_leads_assigned_to ON leads((company_info->>'leadAssignedTo'));`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_recipient_id ON messages(recipient_id);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_group_id ON messages(group_id);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);`);
+
     console.log("PostgreSQL schema initialized successfully.");
 
     const usersCount = await pool.query('SELECT COUNT(*) FROM users');
@@ -779,7 +898,7 @@ async function initializeDB() {
         const nameParts = u.name.split(' ');
         const firstName = nameParts[0];
         const lastName = nameParts.slice(1).join(' ') || 'User';
-        const designation = u.designation || (u.role === 'admin' ? 'Super Admin' : (u.role === 'supervisor' ? 'Supervisor' : 'Subuser'));
+        const designation = u.designation || ROLE_LABELS[u.role] || 'Business Lead';
         const mobile = '1234567890';
         
         const insertRes = await pool.query(`
@@ -811,12 +930,12 @@ async function initializeDB() {
       await pool.query(`
         INSERT INTO users (first_name, last_name, designation, email, mobile, password, role, status)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `, ['Admin', 'Super Admin', 'Super Admin', 'admin@sagetl.com', '9999999999', hashedAdminPassword, 'admin', 'active']);
+      `, ['Admin', 'Super Admin', 'Super Admin', 'admin@sagetl.com', '9999999999', hashedAdminPassword, ROLES.SUPER_ADMIN, 'active']);
       console.log("Super Admin user 'admin@sagetl.com' created successfully.");
     } else {
       await pool.query(`
-        UPDATE users SET password = $1, role = 'admin', status = 'active' WHERE email = $2
-      `, [hashedAdminPassword, 'admin@sagetl.com']);
+        UPDATE users SET password = $1, role = $3, status = 'active' WHERE email = $2
+      `, [hashedAdminPassword, 'admin@sagetl.com', ROLES.SUPER_ADMIN]);
       console.log("Super Admin user 'admin@sagetl.com' password & role updated successfully.");
     }
 
@@ -883,8 +1002,14 @@ async function initializeDB() {
         "Custom Developments",
         "Others"
       ],
-      noWhyOptions: ["No budget", "Not needed"],
-      opportunityOptions: ["High", "Low"],
+      noWhyOptions: [
+        "No budget",
+        "Not needed",
+        "Using other ERP",
+        "Low turnover",
+        "Decision from global"
+      ],
+      opportunityOptions: ["Low", "Medium", "High"],
       timeframeOptions: ["Immediate", "1-3 months", "3-6 months"],
       currentDatabaseOptions: ["Oracle", "SQL Server", "MySQL", "PostgreSQL"],
       expiryOptions: ["2026", "2027", "2028"],
@@ -942,6 +1067,7 @@ module.exports = {
   Lead: LeadConstructor,
   Task: TaskConstructor,
   OptionsModel,
+  getDescendantUserIds,
   pool,
   query: (text, params) => pool.query(text, params)
 };

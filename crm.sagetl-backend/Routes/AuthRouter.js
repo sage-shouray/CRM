@@ -4,6 +4,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../Models/User"); // Adjust the path as needed
 const { loginValidation } = require("../Middleware/AuthValidation");
+const { authenticateToken } = require("../Middleware/auth");
 const {
   forgotPassword,
   resetPassword,
@@ -28,14 +29,10 @@ router.post("/login", loginValidation, async (req, res) => {
         .status(403)
         .json({ success: false, message: "Your account is inactive. Please contact admin." });
     }
-    // Check password
-    let isMatch = false;
-    if (user.password && user.password.startsWith('$2b$')) {
-      isMatch = await bcrypt.compare(password, user.password);
-    } else {
-      isMatch = password == user.password;
-    }
-
+    // Check password (bcrypt only — no plaintext fallback)
+    const isMatch = user.password
+      ? await bcrypt.compare(password, user.password)
+      : false;
 
     if (!isMatch) {
      
@@ -74,13 +71,13 @@ router.post("/login", loginValidation, async (req, res) => {
     console.error("Login error:", error);
     res
       .status(500)
-      .json({ success: false, message: "Server error", error: error.message });
+      .json({ success: false, message: "Server error" });
   }
 });
 
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
-router.post("/change-password", changePassword);
+router.post("/change-password", authenticateToken, changePassword);
 router.get("/profile/:userId", getUserProfile);
 
 

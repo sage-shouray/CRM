@@ -276,3 +276,23 @@
 }
 
 
+
+/* Status line used while the record loads or when it cannot be loaded. */
+.lead-details-status {
+  margin: 16px 0 0;
+  color: var(--slate-700);
+  font-size: 14px;
+}
+
+/* Recoverable failure (save / add note) shown inline above the form so the
+   user's unsaved edits stay on screen. */
+.lead-details-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  background-color: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 600;
+}

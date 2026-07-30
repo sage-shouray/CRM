@@ -58,10 +58,10 @@ function Login({ setIsAuthenticated, setUserRole }) {
       const { success, message, jwtToken, firstName, userId, role } = result;
       if (success) {
         // Suppress success toast as requested by user
-        localStorage.setItem("token", jwtToken);
-        localStorage.setItem("loggedInUser", firstName);
-        localStorage.setItem("userId", userId);
-        localStorage.setItem("userRole", role);
+        sessionStorage.setItem("token", jwtToken);
+        sessionStorage.setItem("loggedInUser", firstName);
+        sessionStorage.setItem("userId", userId);
+        sessionStorage.setItem("userRole", role);
 
         setIsAuthenticated(true);
         setUserRole(role);

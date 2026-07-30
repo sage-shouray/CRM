@@ -1,14 +1,54 @@
+/* Fluid dashboard scale.
+   The layout is designed at laptop size; on larger monitors we scale the whole
+   dashboard proportionally instead of stretching it, so spacing/typography keep
+   the same balance at any screen size. Height is divided by the scale so the
+   single-screen (no-scroll) layout still fits exactly. */
 .home-dashboard-container.compact-dashboard {
+    --dash-scale: 1;
+    --dash-max-width: 1400px;
+    zoom: var(--dash-scale);
     padding: 8px 16px;
-    max-width: 1400px;
+    max-width: var(--dash-max-width);
     margin: 0 auto;
     display: flex;
     flex-direction: column;
     gap: 8px;
     font-family: inherit;
     box-sizing: border-box;
-    height: calc(100vh - 56px);
+    height: calc((100vh - 56px) / var(--dash-scale));
     overflow: hidden;
+}
+
+/* Large laptop / small desktop */
+@media (min-width: 1440px) {
+    .home-dashboard-container.compact-dashboard {
+        --dash-scale: 1.08;
+        --dash-max-width: 1500px;
+    }
+}
+
+/* Standard desktop monitor */
+@media (min-width: 1680px) {
+    .home-dashboard-container.compact-dashboard {
+        --dash-scale: 1.15;
+        --dash-max-width: 1560px;
+    }
+}
+
+/* Full HD monitor */
+@media (min-width: 1920px) {
+    .home-dashboard-container.compact-dashboard {
+        --dash-scale: 1.22;
+        --dash-max-width: 1620px;
+    }
+}
+
+/* 2K / 4K monitor */
+@media (min-width: 2560px) {
+    .home-dashboard-container.compact-dashboard {
+        --dash-scale: 1.5;
+        --dash-max-width: 1800px;
+    }
 }
 
 /* Modern Humanized Page Header */
@@ -33,6 +73,8 @@
     align-items: flex-start;
     gap: 4px;
     text-align: left;
+    flex: 1 1 260px;
+    min-width: 0;
 }
 
 .header-subtitle-row {
@@ -76,18 +118,48 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    flex-shrink: 0;
 }
 
-.btn-header-action {
+.dash-header-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     padding: 9px 16px;
     border-radius: 8px;
     font-size: 13px;
     font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    flex-shrink: 0;
     cursor: pointer;
     transition: all var(--transition-fast);
+}
+
+.dash-header-btn span {
+    white-space: nowrap;
+    line-height: 1;
+}
+
+/* Hard-cap the icon size so buttons never blow up / collide,
+   even before Font Awesome's base CSS loads. */
+.dash-header-btn svg,
+.dash-header-btn .svg-inline--fa {
+    width: 14px !important;
+    height: 14px !important;
+    flex-shrink: 0;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+@media (max-width: 640px) {
+    .header-action-group {
+        width: 100%;
+        justify-content: flex-start;
+    }
 }
 
 .btn-primary-action {
@@ -508,12 +580,54 @@
 }
 
 /* Responsive Grid Breakpoints */
+@media (max-width: 1280px) {
+    .dashboard-three-column-grid {
+        /* Give the calendar a little less room before it has to stack */
+        grid-template-columns: 1fr 1.8fr;
+        gap: 14px;
+    }
+}
+
+/* Tablet and below: stack the columns and let the page scroll normally
+   instead of forcing everything into one clipped viewport. */
 @media (max-width: 1024px) {
+    .home-dashboard-container.compact-dashboard {
+        height: auto;
+        min-height: calc(100vh - 56px);
+        overflow: visible;
+    }
+
     .dashboard-three-column-grid {
         grid-template-columns: 1fr;
+        overflow: visible;
+    }
+
+    .grid-col {
+        height: auto;
+        overflow: visible;
+    }
+
+    .grid-col.col-calendar {
+        min-height: 420px;
     }
 
     .grid-col.col-agenda-todo {
         grid-column: span 1;
+        min-height: 520px;
+    }
+}
+
+@media (max-width: 640px) {
+    .home-dashboard-container.compact-dashboard {
+        padding: 8px 10px;
+    }
+
+    .dashboard-metrics-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .grid-col.col-calendar {
+        min-height: 360px;
     }
 }

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { ROLES, ROLE_ORDER, ROLE_LABELS, roleLabel, normalizeRole } from "../../roles";
 import axios from "axios";
 import AddUser from "./AddUser";
 import EditUserModal from "./EditUserModal";
 import "./UserTable.css";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
+import { API_BASE_URL } from "../../config";
 
 const UserModalOverlay = ({ children, onClose }) => {
   return (
@@ -113,9 +114,11 @@ const UserTable = () => {
 
         <select name="role" value={filters.role} onChange={handleFilterChange}>
           <option value="">All Roles</option>
-          <option value="admin">Admin</option>
-          <option value="supervisor">Supervisor</option>
-          <option value="subuser">Subuser</option>
+          {ROLE_ORDER.map((r) => (
+            <option key={r} value={r}>
+              {ROLE_LABELS[r]}
+            </option>
+          ))}
         </select>
 
         <input
@@ -173,7 +176,7 @@ const UserTable = () => {
                 <td>{user.firstName}</td>
                 <td>{user.lastName}</td>
                 <td>{user.email}</td>
-                <td>{user.role}</td>
+                <td>{roleLabel(user.role)}</td>
                 <td>{user.status}</td>
                 <td>
                   <button

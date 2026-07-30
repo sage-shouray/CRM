@@ -13,13 +13,15 @@ import {
   faKey, 
   faUserGear,
   faLayerGroup,
-  faFolderOpen
+  faFolderOpen,
+  faBuilding
 } from "@fortawesome/free-solid-svg-icons";
 
 // Mapping dropdown items to paths
 const pathsByItem = {
   "Create Leads": "/create-lead",
   "Company Info": "/leads",
+  Companies: "/companies",
   BI: "/bi",
   "Unassigned Leads": "/unassigned-leads",
   Overview: "/team-overview",
@@ -35,6 +37,7 @@ const pathsByItem = {
 const itemIcons = {
   "Create Leads": faPlus,
   "Company Info": faList,
+  Companies: faBuilding,
   BI: faChartPie,
   "Unassigned Leads": faUserSlash,
   Overview: faUsers,

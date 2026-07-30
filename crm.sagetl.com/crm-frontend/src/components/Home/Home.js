@@ -23,11 +23,12 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Home.css";
 import useAuthGuard from "./useAuthGuard";
+import { ROLES, normalizeRole, roleLabel, canManageTeam } from "../../roles";
 import HomeCalendar from "./HomeCalendar";
 import HomeToDoWidget from "./HomeToDoWidget";
 import LeadDetails from "../Leads/LeadDetails";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
+import { API_BASE_URL } from "../../config";
 
 function Home() {
   useAuthGuard();
@@ -47,8 +48,8 @@ function Home() {
   const [selectedDate, setSelectedDate] = useState(getTodayStr);
 
   useEffect(() => {
-    const role = localStorage.getItem("userRole") || "subuser";
-    const name = localStorage.getItem("loggedInUser") || "User";
+    const role = normalizeRole(sessionStorage.getItem("userRole")) || ROLES.BUSINESS_LEAD;
+    const name = sessionStorage.getItem("loggedInUser") || "User";
 
     setUserRole(role);
     setUserName(name);
@@ -59,7 +60,7 @@ function Home() {
   const fetchDashboardLeads = async () => {
     setIsLoadingLeads(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       if (!token) return;
 
       const response = await axios.get(`${API_BASE_URL}/api/leads`, {
@@ -80,12 +81,8 @@ function Home() {
     return "Good Evening";
   };
 
-  const getPortalTitle = () => {
-    const r = (userRole || "").toLowerCase();
-    if (r === "admin") return "ADMINISTRATOR PORTAL";
-    if (r === "supervisor") return "SUPERVISOR PORTAL";
-    return "SUBUSER PORTAL";
-  };
+  const getPortalTitle = () =>
+    `${roleLabel(userRole).toUpperCase()} PORTAL`;
 
   // Convert leads nextAction / createdAt into calendar events format
   const calendarEvents = [];
@@ -162,16 +159,16 @@ function Home() {
         </div>
 
         <div className="header-action-group">
-          <button onClick={() => navigate("/create-lead")} className="btn-header-action btn-primary-action">
+          <button onClick={() => navigate("/create-lead")} className="dash-header-btn btn-primary-action">
             <FontAwesomeIcon icon={faPlus} />
             <span>Create Lead</span>
           </button>
-          <button onClick={() => navigate("/leads")} className="btn-header-action btn-secondary-action">
+          <button onClick={() => navigate("/leads")} className="dash-header-btn btn-secondary-action">
             <FontAwesomeIcon icon={faList} />
             <span>Lead Directory</span>
           </button>
-          {(userRole === "admin" || userRole === "supervisor") && (
-            <button onClick={() => navigate("/unassigned-leads")} className="btn-header-action btn-secondary-action">
+          {canManageTeam(userRole) && (
+            <button onClick={() => navigate("/unassigned-leads")} className="dash-header-btn btn-secondary-action">
               <FontAwesomeIcon icon={faLayerGroup} />
               <span>Unassigned</span>
             </button>

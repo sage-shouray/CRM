@@ -59,7 +59,7 @@ const UnassignedLeads = () => {
           `${API_BASE_URL}/api/unassigned-leads`,
           {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${sessionStorage.getItem("token")}`,
             },
             params: filters,
           }
@@ -82,7 +82,7 @@ const UnassignedLeads = () => {
           `${API_BASE_URL}/api/active-users`,
           {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${sessionStorage.getItem("token")}`,
             },
           }
         );
@@ -117,7 +117,7 @@ const UnassignedLeads = () => {
         `${API_BASE_URL}/api/leads/assign-bulk`,
         { leadIds: selectedLeads, assignedUserId: selectedUserId },
         {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
         }
       );
 
@@ -126,7 +126,7 @@ const UnassignedLeads = () => {
         `${API_BASE_URL}/api/unassigned-leads`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${sessionStorage.getItem("token")}`,
           },
         }
       );

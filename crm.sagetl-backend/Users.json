@@ -3,7 +3,7 @@
     "name": "Super Admin",
     "email": "admin@sagetl.com",
     "password": "Admin@1234",
-    "role": "admin",
+    "role": "superadmin",
     "designation": "Super Admin",
     "userId": "ADM000"
   },
@@ -11,7 +11,7 @@
     "name": "Prashant AD",
     "email": "prashant@sagetl.com",
     "password": "Sage123",
-    "role": "supervisor",
+    "role": "admin",
     "designation": "AD",
     "userId": "SUP001"
   },
@@ -19,7 +19,7 @@
     "name": "Anushka IS",
     "email": "anushka@sagetl.com",
     "password": "Sage123",
-    "role": "subuser",
+    "role": "businesslead",
     "designation": "IS",
     "userId": "SUB001",
     "supervisorEmail": "prashant@sagetl.com"
@@ -28,7 +28,7 @@
     "name": "Kanishka IS",
     "email": "kanishka@sagetl.com",
     "password": "Sage123",
-    "role": "subuser",
+    "role": "businesslead",
     "designation": "IS",
     "userId": "SUB002",
     "supervisorEmail": "prashant@sagetl.com"
@@ -37,7 +37,7 @@
     "name": "Utkarsh BDM",
     "email": "utkarsh@sagetl.com",
     "password": "Sage123",
-    "role": "subuser",
+    "role": "businesslead",
     "designation": "BDM",
     "userId": "SUB003",
     "supervisorEmail": "prashant@sagetl.com"
@@ -46,7 +46,7 @@
     "name": "Vishal BDM",
     "email": "vishal@sagetl.com",
     "password": "Sage123",
-    "role": "subuser",
+    "role": "businesslead",
     "designation": "BDM",
     "userId": "SUB004",
     "supervisorEmail": "prashant@sagetl.com"
@@ -55,7 +55,7 @@
     "name": "Akash BDM",
     "email": "akash@sagetl.com",
     "password": "Sage123",
-    "role": "subuser",
+    "role": "businesslead",
     "designation": "BDM",
     "userId": "SUB005",
     "supervisorEmail": "prashant@sagetl.com"

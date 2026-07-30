@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { ROLES, normalizeRole } from "../../roles";
 import axios from "axios";
 import {
   companyFormConfig,
@@ -9,11 +10,25 @@ import "./LeadDetails.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
 
-const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
+// Must stay in step with the Lead Type list on the Create Lead form, otherwise
+// a lead saved with a type missing here opens with an empty dropdown and loses
+// that value on the next save.
+const LEAD_TYPE_OPTIONS = ["Net New", "SAP Installed Base", "PSU's"];
+
+// A populated relation arrives as a user object; the API only ever wants the id.
+const idOf = (value) =>
+  value && typeof value === "object" ? value._id ?? value.id ?? null : value;
+
+const LeadDetails = ({ leadNumber, onClose, onUpdate, startInEditMode = false }) => {
   const [lead, setLead] = useState(null);
   const [loading, setLoading] = useState(true);
+  // `error` means the record could not be loaded at all; `actionError` is a
+  // recoverable failure (save / add note) and must never unmount the form,
+  // otherwise a rejected save would discard everything the user just typed.
   const [error, setError] = useState(null);
-  const [editMode, setEditMode] = useState(false);
+  const [actionError, setActionError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(startInEditMode);
   const [editedLead, setEditedLead] = useState({});
   const [newDescription, setNewDescription] = useState("");
   const [options, setOptions] = useState({});
@@ -47,12 +62,13 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
         ]);
         const allUsers = userNamesResponse.data || [];
         const bdmNames = allUsers
-          .filter(user => (user.designation || "").toUpperCase() === "BDM")
+          // BDM is a role now, not a free-text designation.
+          .filter((user) => normalizeRole(user.role) === ROLES.BDM)
           .map(user => user.firstName);
         setOptions((prevOptions) => ({
           ...prevOptions,
           ...optionsResponse.data,
-          leadTypeOptions: ["Net New", "SAP Installed Base"],
+          leadTypeOptions: LEAD_TYPE_OPTIONS,
           bdmOptions: bdmNames,
           leadAssignedToOptions: allUsers,
         }));
@@ -96,53 +112,119 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
   const handleAddDescription = async () => {
     if (!newDescription.trim()) return;
     try {
-      const userId = localStorage.getItem("userId");
+      setActionError(null);
       const response = await axios.post(
         `${API_BASE_URL}/api/leads/${leadNumber}/descriptions`,
-        { description: newDescription, userId }
+        { description: newDescription }
       );
+      // Only the notes list changes here — keep the user's in-progress edits.
       setLead(response.data);
-      setEditedLead(response.data);
+      setEditedLead((prev) => ({
+        ...prev,
+        descriptions: response.data.descriptions,
+      }));
       setNewDescription("");
+      if (onUpdate) onUpdate();
     } catch (err) {
-      setError(err.message || "An error occurred while adding a description");
+      setActionError(
+        err.response?.data?.error ||
+          err.message ||
+          "An error occurred while adding a description"
+      );
     }
+  };
+
+  // Send only the three editable sections. Notes are owned by the dedicated
+  // add-description endpoint; posting them back here would round-trip populated
+  // `addedBy` user objects (password hash included) and any file buffers into
+  // the record, overwriting the stored notes with denormalised copies.
+  const buildPayload = () => {
+    const companyInfo = { ...(editedLead.companyInfo || {}) };
+    if (companyInfo.leadAssignedTo !== undefined) {
+      companyInfo.leadAssignedTo = idOf(companyInfo.leadAssignedTo);
+    }
+
+    return {
+      companyInfo,
+      contactInfo: editedLead.contactInfo || {},
+      itLandscape: {
+        netNew: editedLead.itLandscape?.netNew || {},
+        SAPInstalledBase: editedLead.itLandscape?.SAPInstalledBase || {},
+      },
+    };
   };
 
   const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    setActionError(null);
     try {
-      const leadToSave = {
-        ...editedLead,
-        itLandscape: {
-          ...editedLead.itLandscape,
-          SAPInstalledBase: editedLead.itLandscape?.SAPInstalledBase || {},
-        },
-      };
-
       const response = await axios.put(
         `${API_BASE_URL}/api/leads/${leadNumber}`,
-        leadToSave
+        buildPayload()
       );
-      setLead(response.data);
+      const saved = response.data;
+      setLead(saved);
+      setEditedLead(JSON.parse(JSON.stringify(saved)));
       setEditMode(false);
-      onUpdate();
+      if (onUpdate) onUpdate();
     } catch (err) {
-      setError(
+      setActionError(
         err.response?.data?.error || "An error occurred while saving changes"
       );
+    } finally {
+      setSaving(false);
     }
   };
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-  if (!lead) return <div>No lead found</div>;
+  const handleCancel = () => {
+    // Discard any unsaved edits instead of keeping them in the form.
+    setEditedLead(JSON.parse(JSON.stringify(lead)));
+    setActionError(null);
+    setEditMode(false);
+  };
+
+  // Loading and fatal-error states still render inside the modal shell, so the
+  // user always has a way back out of an overlay they opened.
+  if (loading || error || !lead) {
+    return (
+      <div className="modal">
+        <div className="modal-content">
+          <h2>Lead Details{leadNumber ? ` - ${leadNumber}` : ""}</h2>
+          <button onClick={onClose}>Close</button>
+          <p className="lead-details-status">
+            {loading
+              ? "Loading…"
+              : error
+              ? `Error: ${error}`
+              : "No lead found"}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // A field may declare showIf to mirror the conditional logic in CreateLeads,
+  // e.g. "If no, why" only applies when Using ERP is "No".
+  const isFieldVisible = (field, section, subSection) => {
+    if (!field.showIf) return true;
+    const current = subSection
+      ? editedLead?.[section]?.[subSection]?.[field.showIf.field]
+      : editedLead?.[section]?.[field.showIf.field];
+    return current === field.showIf.equals;
+  };
 
   const renderFields = (config, section, subSection = null) => {
     return Array.isArray(config)
-      ? config.map((row, rowIndex) => (
+      ? config.map((row, rowIndex) => {
+          const visibleRow = Array.isArray(row)
+            ? row.filter((field) => isFieldVisible(field, section, subSection))
+            : [];
+          if (visibleRow.length === 0) return null;
+
+          return (
           <div className="form-row-ld" key={rowIndex}>
-            {Array.isArray(row) &&
-              row.map((field) => (
+            {visibleRow.map((field) => (
                 <div
                   className="form-group-ld"
                   key={field.name}
@@ -188,7 +270,7 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
                         style={{ marginRight: "10px" }}
                       >
                         <option value="" disabled>Select {field.label}</option>
-                        {(options[field.options] || (field.name === "leadType" ? ["Net New", "SAP Installed Base"] : []))?.map((option, index) => (
+                        {(options[field.options] || (field.name === "leadType" ? LEAD_TYPE_OPTIONS : []))?.map((option, index) => (
                           <option key={index} value={option._id || option}>
                             {typeof option === "object" &&
                             option.firstName &&
@@ -269,7 +351,8 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
                 </div>
               ))}
           </div>
-        ))
+          );
+        })
       : null;
   };
 
@@ -277,17 +360,25 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
     const contactData = editedLead.contactInfo?.[role] || {};
     const fieldsConfig = contactFormConfig.find((c) => c.role.toLowerCase().replace(/\s+/g, '') === role.toLowerCase() || (role === 'businessHead' && c.role === 'Business Head'))?.fields || [];
 
+    // The config names fields itName / itMobile, but the server stores them as
+    // contactInfo.it.name / .mobile — strip the role prefix to read the value.
+    const storedKeyFor = (fieldName) =>
+      fieldName.slice(role.length).charAt(0).toLowerCase() +
+      fieldName.slice(role.length + 1);
+
     return (
       <div className="contact-role-ld">
         <h4>{role.toUpperCase()} Contact</h4>
         <div className="form-row-ld">
-          {fieldsConfig.map((field) => (
+          {fieldsConfig.map((field) => {
+            const storedKey = storedKeyFor(field.name);
+            return (
             <div className="form-group-ld" key={field.name}>
               <label>{field.label}:</label>
               <input
                 type={field.type}
                 name={field.name}
-                value={contactData[field.name] || ""}
+                value={contactData[storedKey] || ""}
                 onChange={(e) => {
                   const val = e.target.value;
                   setEditedLead((prev) => ({
@@ -296,7 +387,7 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
                       ...prev.contactInfo,
                       [role]: {
                         ...prev.contactInfo?.[role],
-                        [field.name]: val,
+                        [storedKey]: val,
                       },
                     },
                   }));
@@ -304,7 +395,8 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
                 disabled={!editMode}
               />
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -314,11 +406,26 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
     <div className="modal">
       <div className="modal-content">
         <h2>Lead Details - {lead.leadNumber}</h2>
-        <button onClick={onClose}>Close</button>
-        <button onClick={() => setEditMode(!editMode)}>
+        <button onClick={onClose} disabled={saving}>
+          Close
+        </button>
+        <button
+          onClick={() => (editMode ? handleCancel() : setEditMode(true))}
+          disabled={saving}
+        >
           {editMode ? "Cancel" : "Edit"}
         </button>
-        {editMode && <button onClick={handleSave}>Save Changes</button>}
+        {editMode && (
+          <button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
+        )}
+
+        {actionError && (
+          <p className="lead-details-error" role="alert">
+            {actionError}
+          </p>
+        )}
 
         {/* Company Information */}
         <section className="form-section-ld">
@@ -376,8 +483,15 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate }) => {
                 lead.descriptions.map((desc, index) => (
                   <tr key={index}>
                     <td>{desc.description}</td>
-                    <td>{new Date(desc.createdAt).toLocaleString()}</td>
-                    <td>{desc.addedBy ? desc.addedBy.firstName : "Unknown"}</td>
+                    <td>
+                      {desc.createdAt
+                        ? new Date(desc.createdAt).toLocaleString()
+                        : "—"}
+                    </td>
+                    <td>
+                      {desc.addedBy?.firstName ||
+                        (desc.addedBy ? `User #${idOf(desc.addedBy)}` : "Unknown")}
+                    </td>
                   </tr>
                 ))}
             </tbody>

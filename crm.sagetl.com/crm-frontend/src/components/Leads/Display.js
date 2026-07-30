@@ -10,8 +10,9 @@ const Display = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
+  const [openInEditMode, setOpenInEditMode] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const currentUserId = localStorage.getItem("userId");
+  const currentUserId = sessionStorage.getItem("userId");
  const [options, setOptions] = useState({
    verticalOptions: [],
    priorityOptions: [],
@@ -64,12 +65,15 @@ const Display = () => {
  };
 
 
-  const handleLeadClick = (leadNumber) => {
+  // openForEdit: skip the read-only view and land straight in an editable form
+  const handleLeadClick = (leadNumber, openForEdit = false) => {
     setSelectedLead(leadNumber);
+    setOpenInEditMode(openForEdit);
   };
 
   const handleCloseDetails = () => {
     setSelectedLead(null);
+    setOpenInEditMode(false);
     setRefreshTrigger((prev) => prev + 1); // Trigger a refresh when closing LeadDetails
   };
 
@@ -78,7 +82,7 @@ const Display = () => {
   };
 
     useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
 
     if (!token) {
       setError("No authentication token found. Please log in again.");
@@ -274,7 +278,19 @@ const Display = () => {
                 </button>
               </td>
               <td>{new Date(lead.createdAt).toLocaleDateString()}</td>
-              <td>{lead.companyInfo?.companyName || ""}</td>
+              <td>
+                {lead.companyInfo?.companyName ? (
+                  <button
+                    className="display-button display-company-button"
+                    onClick={() => handleLeadClick(lead.leadNumber, true)}
+                    title="Open this company's full form and edit its details"
+                  >
+                    {lead.companyInfo.companyName}
+                  </button>
+                ) : (
+                  ""
+                )}
+              </td>
               <td>{getLatestDescriptionDate(lead)}</td>
               <td>{lead.createdBy?.firstName || ""}</td>
               <td>{getAssignedUser(lead)}</td>
@@ -293,9 +309,11 @@ const Display = () => {
 
       {selectedLead && (
         <LeadDetails
+          key={`${selectedLead}-${openInEditMode}`}
           leadNumber={selectedLead}
           onClose={handleCloseDetails}
           onUpdate={handleLeadUpdate}
+          startInEditMode={openInEditMode}
         />
       )}
     </div>

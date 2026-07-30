@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { ROLES, normalizeRole, roleLabel } from "../../roles";
 import { ToastContainer } from "react-toastify";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
@@ -42,8 +43,8 @@ function Profile() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
-  const userId = localStorage.getItem("userId");
-  const storedRole = localStorage.getItem("userRole");
+  const userId = sessionStorage.getItem("userId");
+  const storedRole = normalizeRole(sessionStorage.getItem("userRole"));
 
   useEffect(() => {
     fetchUserProfile();
@@ -65,11 +66,11 @@ function Profile() {
         // Fallback to local storage values if fetch returns error
         setProfileData({
           id: userId,
-          firstName: localStorage.getItem("loggedInUser") || "User",
+          firstName: sessionStorage.getItem("loggedInUser") || "User",
           lastName: "",
           email: "Logged in via portal",
-          role: storedRole || "subuser",
-          designation: storedRole ? storedRole.toUpperCase() : "Member",
+          role: storedRole || ROLES.BUSINESS_LEAD,
+          designation: storedRole ? roleLabel(storedRole) : "Member",
           mobile: "N/A",
           status: "active"
         });
@@ -78,11 +79,11 @@ function Profile() {
       console.error("Error fetching profile:", err);
       setProfileData({
         id: userId,
-        firstName: localStorage.getItem("loggedInUser") || "User",
+        firstName: sessionStorage.getItem("loggedInUser") || "User",
         lastName: "",
         email: "Logged in via portal",
-        role: storedRole || "subuser",
-        designation: storedRole ? storedRole.toUpperCase() : "Member",
+        role: storedRole || ROLES.BUSINESS_LEAD,
+        designation: storedRole ? roleLabel(storedRole) : "Member",
         mobile: "N/A",
         status: "active"
       });
@@ -142,8 +143,8 @@ function Profile() {
   };
 
   const getRoleCapabilities = (role) => {
-    const r = (role || "").toLowerCase();
-    if (r === "admin") {
+    const r = normalizeRole(role);
+    if (r === ROLES.SUPER_ADMIN || r === ROLES.ADMIN) {
       return [
         {
           title: "User Management & Access Control",
@@ -166,7 +167,7 @@ function Profile() {
           icon: faTasks
         }
       ];
-    } else if (r === "supervisor") {
+    } else if (r === ROLES.BDM) {
       return [
         {
           title: "Team Overview & Delegation",
@@ -224,8 +225,8 @@ function Profile() {
     );
   }
 
-  const role = profileData?.role || storedRole || "subuser";
-  const fullName = `${profileData?.firstName || ''} ${profileData?.lastName || ''}`.trim() || localStorage.getItem("loggedInUser") || "User Profile";
+  const role = normalizeRole(profileData?.role || storedRole) || ROLES.BUSINESS_LEAD;
+  const fullName = `${profileData?.firstName || ''} ${profileData?.lastName || ''}`.trim() || sessionStorage.getItem("loggedInUser") || "User Profile";
   const initials = (profileData?.firstName?.[0] || '') + (profileData?.lastName?.[0] || profileData?.firstName?.[1] || '');
 
   return (
@@ -312,7 +313,7 @@ function Profile() {
             </div>
 
             <div className="info-field">
-              <label>Assigned Supervisor</label>
+              <label>Reports To</label>
               <div className="field-value-box">
                 <FontAwesomeIcon icon={faBuilding} className="field-icon" />
                 <span>

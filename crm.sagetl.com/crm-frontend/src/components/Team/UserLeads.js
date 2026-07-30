@@ -11,7 +11,7 @@ const UserLeads = () => {
   const [error, setError] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const currentUserId = localStorage.getItem("userId");
+  const currentUserId = sessionStorage.getItem("userId");
 
   const handleLeadClick = (leadNumber) => {
     setSelectedLead(leadNumber);
@@ -27,7 +27,7 @@ const UserLeads = () => {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
 
     if (!token) {
       setError("No authentication token found. Please log in again.");

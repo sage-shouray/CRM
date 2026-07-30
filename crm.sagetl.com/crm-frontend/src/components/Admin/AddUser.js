@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { ROLES, ROLE_ORDER, ROLE_LABELS, roleLabel, normalizeRole } from "../../roles";
 import axios from "axios";
 import "./UserTable.css"; // Assuming the same CSS file is being applied
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
+import { API_BASE_URL } from "../../config";
 
 const AddUser = ({ onClose }) => {
   const [userData, setUserData] = useState({
@@ -12,7 +13,7 @@ const AddUser = ({ onClose }) => {
     email: "",
     mobile: "",
     password: "",
-    role: "subuser",
+    role: ROLES.BUSINESS_LEAD,
     supervisor: "",
     status: "active",
   });
@@ -122,18 +123,20 @@ const AddUser = ({ onClose }) => {
           value={userData.role}
           onChange={handleInputChange}
         >
-          <option value="subuser">Subuser</option>
-          <option value="supervisor">Supervisor</option>
-          <option value="admin">Admin</option>
+          {ROLE_ORDER.map((r) => (
+            <option key={r} value={r}>
+              {ROLE_LABELS[r]}
+            </option>
+          ))}
         </select>
-        <label htmlFor="supervisor">Supervisor</label>
+        <label htmlFor="supervisor">Reports To</label>
         <select
           id="supervisor"
           name="supervisor"
           value={userData.supervisor}
           onChange={handleInputChange}
         >
-          <option value="">No Supervisor</option> {/* Null option */}
+          <option value="">No Manager</option> {/* Null option */}
           {supervisors.map((supervisor) => (
             <option key={supervisor._id} value={supervisor._id}>
               {supervisor.firstName} {supervisor.lastName}

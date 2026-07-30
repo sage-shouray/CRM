@@ -116,8 +116,8 @@ tr:hover td {
   background-color: var(--slate-50);
 }
 
-/* Text link button for lead number inside tables */
-display-button {
+/* Text link button for lead number / company name inside tables */
+.display-button {
   background: transparent;
   border: none;
   color: var(--primary);
@@ -127,10 +127,30 @@ display-button {
   padding: 0;
   text-decoration: underline;
   transition: color var(--transition-fast);
+  font-family: inherit;
 }
 
-display-button:hover {
+.display-button:hover {
   color: var(--primary-hover);
+}
+
+.display-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Company name reads as body text until hovered, so the column stays scannable */
+.display-company-button {
+  color: var(--slate-800);
+  text-align: left;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--slate-400);
+}
+
+.display-company-button:hover {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
 }
 
 /* Messaging styling */

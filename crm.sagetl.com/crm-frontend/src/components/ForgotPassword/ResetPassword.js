@@ -28,7 +28,7 @@ const handleSubmit = async (e) => {
       ? `${API_BASE_URL}/auth/reset-password`
       : `${API_BASE_URL}/auth/change-password`; // Use new route for logged-in users
 
-    const userId = localStorage.getItem("userId"); // Get the logged-in user's ID from local storage
+    const userId = sessionStorage.getItem("userId"); // Get the logged-in user's ID from local storage
 
     const response = await fetch(url, {
       method: "POST",

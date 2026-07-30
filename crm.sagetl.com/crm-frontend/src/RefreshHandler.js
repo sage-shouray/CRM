@@ -1,32 +1,27 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { isAuthenticated as isAuthValid, getUserRole, clearSession } from "./authStorage";
 
 function RefreshHandler({ setIsAuthenticated, setUserRole }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const hasNavigated = useRef(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const userRole = localStorage.getItem("userRole");
-
     const publicPaths = ["/", "/login", "/forgot-password", "/reset-password"];
     const isPublicPath = publicPaths.some((path) =>
       location.pathname.startsWith(path)
     );
 
-    if (token && userRole) {
+    if (isAuthValid()) {
       setIsAuthenticated(true);
-      setUserRole(userRole);
-
-      // Do not force a redirect to a specific path
+      setUserRole(getUserRole());
     } else {
+      // Ensure any stale/expired token is wiped, then bounce off protected pages.
+      clearSession();
       setIsAuthenticated(false);
       setUserRole(null);
 
-      // Only navigate to login if the user is on a protected path
-      if (!isPublicPath && !hasNavigated.current) {
-        hasNavigated.current = true;
+      if (!isPublicPath) {
         navigate("/login", { replace: true });
       }
     }

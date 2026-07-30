@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Login from "./components/Login/Login";
 import Home from "./components/Home/Home";
 import RefreshHandler from "./RefreshHandler";
@@ -10,6 +10,7 @@ import LayoutWithHeader from "./components/Layouts/LayoutWithHeader";
 import LayoutWithoutHeader from "./components/Layouts/LayoutWithoutHeader";
 import CreateLeads from "./components/CreateLeads/CreateLeads";
 import Display from "./components/Leads/Display";
+import Companies from "./components/Companies/Companies";
 import LeadDetails from "./components/Leads/LeadDetails";
 import AdminDashboard from "./components/Admin/AdminDashboard";
 import ToDo from './components/ToDo/ToDo';
@@ -23,38 +24,24 @@ import UserLeads from "./components/Team/UserLeads";
 import UnassignedLeads from "./components/Supervisor/UnassignedLeads";
 import MultipleAssign from "./components/Supervisor/MultipleAssign";
 import Chat from "./components/Chat/Chat";
+import { isAuthenticated as isAuthValid, getUserRole, clearSession } from "./authStorage";
+import { ROLES, ALL_ROLES } from "./roles";
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState(null);
-  const [isLoading, setIsLoading] = useState(true); // Add a loading state
+  const [isAuthenticated, setIsAuthenticated] = useState(isAuthValid());
+  const [userRole, setUserRole] = useState(getUserRole());
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const role = localStorage.getItem("userRole");
-
-    if (token && role) {
-      setIsAuthenticated(true);
-      setUserRole(role);
-    } else {
-      setIsAuthenticated(false);
-      setUserRole(null);
-    }
-
-    setIsLoading(false); // Set loading to false once the check is complete
-  }, []);
-
-  // Simplified PrivateRoute handling authentication and role check
+  // PrivateRoute validates the JWT synchronously at render time (presence +
+  // expiry), so a missing/expired token can never flash protected content and
+  // a direct URL like /home always redirects to /login when unauthenticated.
   function PrivateRoute({ element, allowedRoles }) {
-    if (isLoading) {
-      return null; // Prevent rendering or redirecting while loading
-    }
-
-    if (!isAuthenticated) {
+    if (!isAuthValid()) {
+      clearSession();
       return <Navigate to="/login" replace />;
     }
 
-    if (!allowedRoles.includes(userRole)) {
+    const role = getUserRole();
+    if (!allowedRoles.includes(role)) {
       return <Navigate to="/login" replace />;
     }
 
@@ -89,7 +76,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<Home />}
-                allowedRoles={["subuser", "supervisor", "admin"]}
+                allowedRoles={ALL_ROLES}
               />
             }
           />
@@ -98,7 +85,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<CreateLeads />}
-                allowedRoles={["subuser", "supervisor", "admin"]}
+                allowedRoles={ALL_ROLES}
               />
             }
           />
@@ -107,7 +94,16 @@ function App() {
             element={
               <PrivateRoute
                 element={<Display />}
-                allowedRoles={["subuser", "supervisor", "admin"]}
+                allowedRoles={ALL_ROLES}
+              />
+            }
+          />
+          <Route
+            path="/companies"
+            element={
+              <PrivateRoute
+                element={<Companies />}
+                allowedRoles={ALL_ROLES}
               />
             }
           />
@@ -116,7 +112,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<LeadDetails />}
-                allowedRoles={["subuser", "supervisor", "admin"]}
+                allowedRoles={ALL_ROLES}
               />
             }
           />
@@ -125,7 +121,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<ToDo />}
-                allowedRoles={["subuser", "supervisor", "admin"]}
+                allowedRoles={ALL_ROLES}
               />
             }
           />
@@ -134,7 +130,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<ToDo />}
-                allowedRoles={["subuser", "supervisor", "admin"]}
+                allowedRoles={ALL_ROLES}
               />
             }
           />
@@ -143,7 +139,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<ToDo />}
-                allowedRoles={["subuser", "supervisor", "admin"]}
+                allowedRoles={ALL_ROLES}
               />
             }
           />
@@ -152,7 +148,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<ToDo />}
-                allowedRoles={["subuser", "supervisor", "admin"]}
+                allowedRoles={ALL_ROLES}
               />
             }
           />
@@ -161,7 +157,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<AdminDashboard />}
-                allowedRoles={["admin"]}
+                allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN]}
               />
             }
           />
@@ -170,7 +166,7 @@ function App() {
           <Route
             path="/add-user"
             element={
-              <PrivateRoute element={<AddUser />} allowedRoles={["admin"]} />
+              <PrivateRoute element={<AddUser />} allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN]} />
             }
           />
           <Route
@@ -182,7 +178,7 @@ function App() {
                     <UserTable />
                   </ErrorBoundary>
                 }
-                allowedRoles={["admin"]}
+                allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN]}
               />
             }
           />
@@ -191,7 +187,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<TeamOverview />}
-                allowedRoles={["admin", "supervisor"]}
+                allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.BDM]}
               />
             }
           />
@@ -200,7 +196,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<UserLeads />}
-                allowedRoles={["admin", "supervisor"]}
+                allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.BDM]}
               />
             }
           />
@@ -209,7 +205,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<UnassignedLeads />}
-                allowedRoles={["admin", "supervisor"]}
+                allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.BDM]}
               />
             }
           />
@@ -218,7 +214,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<MultipleAssign />}
-                allowedRoles={["supervisor"]}
+                allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.BDM]}
               />
             }
           /> 
@@ -227,7 +223,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<Chat />}
-                allowedRoles={["subuser", "supervisor", "admin"]}
+                allowedRoles={ALL_ROLES}
               />
             }
           />
@@ -236,7 +232,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<Profile />}
-                allowedRoles={["subuser", "supervisor", "admin"]}
+                allowedRoles={ALL_ROLES}
               />
             }
           />

@@ -1,0 +1,319 @@
+.companies-page {
+  padding: 16px 20px;
+  max-width: 1500px;
+  margin: 0 auto;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.companies-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.companies-header h1 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--slate-900);
+  margin: 0;
+  letter-spacing: -0.4px;
+}
+
+.companies-header p {
+  font-size: 13px;
+  color: var(--slate-500);
+  margin: 4px 0 0 0;
+}
+
+.companies-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--slate-600);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.companies-error {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-hover);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+/* Two-pane: company list on the left, full record on the right */
+.companies-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.companies-list-panel {
+  background: #ffffff;
+  border: 1px solid var(--slate-200);
+  border-radius: 12px;
+  padding: 12px;
+  position: sticky;
+  top: 12px;
+  box-sizing: border-box;
+}
+
+.companies-search {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--slate-300);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+}
+
+.companies-search:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+.companies-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+}
+
+.companies-list-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 9px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: all var(--transition-fast);
+}
+
+.companies-list-item:hover {
+  background: var(--slate-50);
+}
+
+.companies-list-item.is-active {
+  background: var(--primary-light);
+  border-color: var(--primary-border);
+}
+
+.companies-list-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--slate-900);
+}
+
+.companies-list-meta {
+  font-size: 11.5px;
+  color: var(--slate-500);
+}
+
+.companies-detail-panel {
+  background: #ffffff;
+  border: 1px solid var(--slate-200);
+  border-radius: 12px;
+  padding: 18px 20px;
+  min-height: 400px;
+  box-sizing: border-box;
+}
+
+.companies-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--slate-200);
+  margin-bottom: 6px;
+}
+
+.companies-detail-header h2 {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--slate-900);
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.companies-detail-header p {
+  font-size: 12.5px;
+  color: var(--slate-500);
+  margin: 3px 0 0 0;
+}
+
+.companies-edit-btn {
+  background: var(--slate-900);
+  color: #ffffff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.companies-edit-btn:hover {
+  background: var(--primary);
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+}
+
+.companies-section {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--slate-100);
+}
+
+.companies-section:last-child {
+  border-bottom: none;
+}
+
+.companies-section > h3 {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--primary);
+  margin: 0 0 12px 0;
+}
+
+.companies-subsection {
+  margin-bottom: 14px;
+}
+
+.companies-subsection:last-child {
+  margin-bottom: 0;
+}
+
+.companies-subsection h4 {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--slate-700);
+  margin: 0 0 8px 0;
+}
+
+/* Label/value pairs that reflow with the available width */
+.companies-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px 18px;
+  margin: 0;
+}
+
+.companies-field {
+  min-width: 0;
+}
+
+.companies-field dt {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--slate-400);
+  margin-bottom: 2px;
+}
+
+.companies-field dd {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--slate-900);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.companies-field dd.is-empty {
+  color: var(--slate-300);
+  font-weight: 500;
+}
+
+.companies-empty-note {
+  font-size: 12.5px;
+  color: var(--slate-400);
+  margin: 0;
+}
+
+.companies-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.companies-note {
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.companies-note header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.companies-note-author {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--slate-800);
+}
+
+.companies-note-date {
+  font-size: 11px;
+  color: var(--slate-500);
+}
+
+.companies-note p {
+  font-size: 13px;
+  color: var(--slate-700);
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.companies-note-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--slate-500);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .companies-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .companies-list-panel {
+    position: static;
+  }
+
+  .companies-list {
+    max-height: 240px;
+  }
+}

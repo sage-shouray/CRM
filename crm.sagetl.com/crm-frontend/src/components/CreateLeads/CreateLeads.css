@@ -376,3 +376,73 @@ input:disabled, select:disabled {
   border-color: var(--slate-200) !important;
   box-shadow: none !important;
 }
+
+/* ---- Company Name type-ahead ---- */
+.company-typeahead {
+  position: relative;
+}
+
+.company-typeahead-loading {
+  position: absolute;
+  right: 12px;
+  top: 38px;
+  font-size: 11px;
+  color: var(--slate-500, #64748b);
+  pointer-events: none;
+}
+
+.company-suggestions {
+  position: absolute;
+  z-index: 40;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid var(--slate-200, #e2e8f0);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+}
+
+.company-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.company-suggestion.is-highlighted {
+  background: var(--slate-100, #f1f5f9);
+}
+
+.company-suggestion-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--slate-900, #0f172a);
+}
+
+.company-suggestion-meta {
+  font-size: 11.5px;
+  color: var(--slate-500, #64748b);
+}
+
+/* An exact hit is the one that blocks submission — mark it clearly. */
+.company-suggestion.is-exact .company-suggestion-name,
+.company-suggestion.is-exact .company-suggestion-meta {
+  color: #b91c1c;
+}
+
+.company-suggestion.is-exact {
+  background: #fef2f2;
+}
+
+.company-suggestion.is-exact.is-highlighted {
+  background: #fee2e2;
+}

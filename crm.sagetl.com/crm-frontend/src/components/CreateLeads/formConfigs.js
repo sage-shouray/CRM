@@ -159,6 +159,24 @@ export const itLandscapeConfig = {
       },
     ],
     [
+      // Mirrors the conditional pair in CreateLeads: only one of these is ever
+      // relevant, driven by the Using ERP answer.
+      {
+        name: "ifYesWhichOne",
+        label: "If yes, which ERP",
+        type: "select",
+        options: "ERPTypeOptions",
+        showIf: { field: "usingERP", equals: "Yes" },
+      },
+      {
+        name: "ifNoWhy",
+        label: "If no, why",
+        type: "select",
+        options: "noWhyOptions",
+        showIf: { field: "usingERP", equals: "No" },
+      },
+    ],
+    [
       { name: "authority", label: "Authority", type: "text" },
       {
         name: "opportunityValue1",

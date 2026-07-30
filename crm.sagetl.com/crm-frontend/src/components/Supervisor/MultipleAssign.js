@@ -59,7 +59,7 @@ const MultipleAssign = () => {
          `${API_BASE_URL}/api/assigned-leads`,
          {
            headers: {
-             Authorization: `Bearer ${localStorage.getItem("token")}`,
+             Authorization: `Bearer ${sessionStorage.getItem("token")}`,
            },
            params: filters,
          }
@@ -83,7 +83,7 @@ const MultipleAssign = () => {
           `${API_BASE_URL}/api/active-users`,
           {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${sessionStorage.getItem("token")}`,
             },
           }
         );
@@ -117,7 +117,7 @@ const MultipleAssign = () => {
       `${API_BASE_URL}/api/leads/assign-bulk`,
       { leadIds: selectedLeads, assignedUserId: selectedUserId },
       {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
       }
     );
     console.log(response.data.message); // Log success message
@@ -127,7 +127,7 @@ const MultipleAssign = () => {
     const leadsResponse = await axios.get(
       `${API_BASE_URL}/api/assigned-leads`,
       {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
       }
     );
     setLeads(leadsResponse.data); // Update leads in the UI

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { roleLabel } from "../../roles";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "./TeamOverview.css"; // Add the CSS file
@@ -19,7 +20,7 @@ const TeamOverview = () => {
         `${API_BASE_URL}/api/team-overview`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${sessionStorage.getItem("token")}`,
           },
         }
       );
@@ -56,7 +57,7 @@ const TeamOverview = () => {
                   <td>{user.firstName}</td>
                   <td>{user.lastName}</td>
                   <td>{user.email}</td>
-                  <td>{user.role}</td>
+                  <td>{roleLabel(user.role)}</td>
                   <td>
                     <button
                       className="view-leads-btn"

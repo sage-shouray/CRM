@@ -33,7 +33,7 @@ const login = async (req, res) => {
 
     const jwtToken = jwt.sign(
       { email: user.email, _id: user._id, role: user.role },
-      process.env.JWT_SECRET || "default_secret",
+      process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
 
@@ -72,7 +72,7 @@ const forgotPassword = async (req, res) => {
         firstName: user.firstName,
         role: user.role,
       },
-      process.env.JWT_SECRET || "default_secret",
+      process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
     const resetLink = `http://localhost:3000/reset-password/${token}`;
@@ -118,7 +118,7 @@ const resetPassword = async (req, res) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || "default_secret");
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (error) {
       if (error.name === "TokenExpiredError") {
         return res
@@ -151,12 +151,14 @@ const resetPassword = async (req, res) => {
 
 const changePassword = async (req, res) => {
   try {
-    const { userId, currentPassword, newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body;
+    // Always act on the authenticated user, never a client-supplied id.
+    const userId = req.user && req.user.id;
 
     if (!userId || !newPassword) {
       return res
         .status(400)
-        .json({ success: false, message: "User ID and new password are required" });
+        .json({ success: false, message: "New password is required" });
     }
 
     const user = await UserModel.findById(userId);
@@ -166,18 +168,14 @@ const changePassword = async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
-    if (currentPassword) {
-      let isMatch = false;
-      if (user.password && user.password.startsWith('$2b$')) {
-        isMatch = await bcrypt.compare(currentPassword, user.password);
-      } else {
-        isMatch = currentPassword === user.password;
-      }
-      if (!isMatch) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Current password is incorrect" });
-      }
+    // Verify the current password (bcrypt only — no plaintext fallback).
+    const isMatch = user.password
+      ? await bcrypt.compare(currentPassword || "", user.password)
+      : false;
+    if (!isMatch) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Current password is incorrect" });
     }
 
     const salt = await bcrypt.genSalt(10);

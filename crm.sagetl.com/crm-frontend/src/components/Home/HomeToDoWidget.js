@@ -26,10 +26,10 @@ import {
 import axios from "axios";
 import "./HomeToDoWidget.css";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
+import { API_BASE_URL } from "../../config";
 
 function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = [], isLoadingLeads, onOpenLead }) {
-  const userId = localStorage.getItem("userId") || "default";
+  const userId = sessionStorage.getItem("userId") || "default";
   const todayStr = new Date().toISOString().split("T")[0];
 
   const yesterdayDate = new Date();
@@ -51,7 +51,7 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
 
   // Initial default tasks pre-populated with dummy data for testing
   const getInitialTasks = () => {
-    const saved = localStorage.getItem(`crm_tasks_${userId}`);
+    const saved = sessionStorage.getItem(`crm_tasks_${userId}`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -115,7 +115,7 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
 
   const fetchTasksFromDB = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       if (!token) return;
       const res = await axios.get(`${API_BASE_URL}/api/tasks`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -160,7 +160,7 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
   const fetchLeadsForSelection = async () => {
     try {
       setIsLoadingSystemLeads(true);
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       if (!token) return;
 
       const res = await axios.get(`${API_BASE_URL}/api/leads`, {
@@ -260,7 +260,7 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
   // Status Action 1: Mark Done
   const handleMarkDone = async (taskId) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await axios.put(`${API_BASE_URL}/api/tasks/${taskId}`, {
         status: "done"
       }, {
@@ -277,7 +277,7 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
   // Status Action 2: Mark Not Done
   const handleMarkNotDone = async (taskId) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await axios.put(`${API_BASE_URL}/api/tasks/${taskId}`, {
         status: "not_done"
       }, {
@@ -300,7 +300,7 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
   const handleConfirmPostpone = async (taskId) => {
     if (!postponeDate) return;
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await axios.put(`${API_BASE_URL}/api/tasks/${taskId}`, {
         dueDate: postponeDate,
         status: "postponed"
@@ -323,7 +323,7 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
     if (!newTask.title.trim()) return;
 
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await axios.post(`${API_BASE_URL}/api/tasks`, {
         taskId: "task-" + Date.now(),
         title: newTask.title.trim(),

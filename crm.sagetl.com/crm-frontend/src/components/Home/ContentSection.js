@@ -1,4 +1,5 @@
 import React from "react";
+import { ROLES, normalizeRole } from "../../roles";
 import { useNavigate } from "react-router-dom";
 import "./ContentSection.css";
 import todo from "./to-do-list.png";
@@ -10,6 +11,7 @@ import unassignedLeads from "./unassigned.png";
 import bi from "./bi.png";
 
 const ContentSection = ({ userRole }) => {
+  const role = normalizeRole(userRole);
   const navigate = useNavigate();
 
   const handleButtonClick = (path) => {
@@ -112,9 +114,9 @@ const ContentSection = ({ userRole }) => {
 
   return (
     <div className="content-container">
-      {userRole === "admin" && renderAdminContent()}
-      {userRole === "supervisor" && renderSupervisorContent()}
-      {userRole === "subuser" && renderSubuserContent()}
+      {(role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN) && renderAdminContent()}
+      {role === ROLES.BDM && renderSupervisorContent()}
+      {role === ROLES.BUSINESS_LEAD && renderSubuserContent()}
     </div>
   );
 };

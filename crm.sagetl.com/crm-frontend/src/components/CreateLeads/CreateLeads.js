@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { ROLES, normalizeRole } from "../../roles";
 import axios from "axios";
 import { Country, State, City } from "country-state-city";
 import "./CreateLeads.css";
@@ -8,9 +9,171 @@ import {
   itLandscapeConfig,
 } from "./formConfigs";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
+import { API_BASE_URL } from "../../config";
+
+// Which IT Landscape block belongs to a given lead type. Lead types with no
+// block of their own (PSU's) show none. Rendering and validation both read
+// this, so a block is never required while it is hidden.
+export const isLandscapeSectionVisible = (section, leadType) => {
+  if (!leadType) return true; // nothing chosen yet — show both
+  if (section === "netNew") return leadType === "Net New";
+  if (section === "SAPInstalledBase") return leadType === "SAP Installed Base";
+  return false;
+};
 
 const FormRow = ({ children }) => <div className="form-row">{children}</div>;
+
+// Company Name with type-ahead. Suggests companies already on file as the user
+// types, and reports an exact (case/space-insensitive) hit to the parent so the
+// form can refuse to create a second lead for the same company.
+const CompanyNameField = ({ field, value, onChange, error, onDuplicateChange }) => {
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const containerRef = useRef(null);
+
+  const term = (value || "").trim();
+
+  useEffect(() => {
+    if (term.length < 2) {
+      setSuggestions([]);
+      setOpen(false);
+      onDuplicateChange(null);
+      return;
+    }
+
+    // Debounced so typing does not fire a request per keystroke; `cancelled`
+    // keeps a slow response from overwriting a newer one.
+    let cancelled = false;
+    setLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/leads/company-search`, {
+          params: { q: term },
+        });
+        if (cancelled) return;
+        const list = Array.isArray(res.data) ? res.data : [];
+        setSuggestions(list);
+        setHighlight(-1);
+        setOpen(list.length > 0);
+        onDuplicateChange(list.find((c) => c.exact) || null);
+      } catch (err) {
+        if (!cancelled) {
+          // A failed lookup must not block the form — the server still checks.
+          setSuggestions([]);
+          setOpen(false);
+          onDuplicateChange(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [term, onDuplicateChange]);
+
+  // Close when focus or a click leaves the field.
+  useEffect(() => {
+    const onDocMouseDown = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, []);
+
+  const selectSuggestion = (item) => {
+    onChange({ target: { name: field.name, value: item.companyName } });
+    setOpen(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlight((h) => (h + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => (h <= 0 ? suggestions.length - 1 : h - 1));
+    } else if (e.key === "Enter") {
+      // Only intercept Enter when a suggestion is actually highlighted, so
+      // Enter otherwise still submits the form as usual.
+      if (highlight >= 0) {
+        e.preventDefault();
+        selectSuggestion(suggestions[highlight]);
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  };
+
+  const listboxId = `${field.name}-suggestions`;
+
+  return (
+    <div
+      className="form-group primary-company-field full-width company-typeahead"
+      ref={containerRef}
+    >
+      <label htmlFor={field.name}>
+        {field.label}: {field.required && <span className="req-star">*</span>}
+      </label>
+
+      <input
+        type={field.type}
+        id={field.name}
+        name={field.name}
+        value={value || ""}
+        onChange={onChange}
+        onKeyDown={handleKeyDown}
+        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        placeholder="Enter Company Name (Primary Field)..."
+        className={`primary-input ${error ? "mandatory" : ""}`}
+        autoComplete="off"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        aria-autocomplete="list"
+      />
+
+      {loading && <span className="company-typeahead-loading">Searching…</span>}
+
+      {open && suggestions.length > 0 && (
+        <ul className="company-suggestions" id={listboxId} role="listbox">
+          {suggestions.map((item, index) => (
+            <li
+              key={item.leadNumber}
+              role="option"
+              aria-selected={index === highlight}
+              className={`company-suggestion ${
+                index === highlight ? "is-highlighted" : ""
+              } ${item.exact ? "is-exact" : ""}`}
+              // mousedown, not click: blur would close the list first.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                selectSuggestion(item);
+              }}
+              onMouseEnter={() => setHighlight(index)}
+            >
+              <span className="company-suggestion-name">{item.companyName}</span>
+              <span className="company-suggestion-meta">
+                Lead #{item.leadNumber}
+                {item.owner ? ` · ${item.owner}` : ""}
+                {item.exact ? " · already exists" : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {error && <span className="error">{error}</span>}
+    </div>
+  );
+};
 
 const FormGroup = ({
   field,
@@ -211,6 +374,12 @@ const CreateLeads = () => {
     createdBy: "",
   });
   const [errors, setErrors] = useState({});
+  // Set when the typed company name exactly matches one already on file.
+  const [duplicateCompany, setDuplicateCompany] = useState(null);
+  const handleDuplicateChange = useCallback(
+    (match) => setDuplicateCompany(match),
+    []
+  );
   const [options, setOptions] = useState({});
   const [file, setFile] = useState(null);
   const fileInputRef = useRef(null);
@@ -258,13 +427,14 @@ const CreateLeads = () => {
         ]);
         const allUsers = userNamesResponse.data || [];
         const bdmNames = allUsers
-          .filter(user => (user.designation || "").toUpperCase() === "BDM")
+          // BDM is a role now, not a free-text designation.
+          .filter((user) => normalizeRole(user.role) === ROLES.BDM)
           .map(user => user.firstName);
         const allUserNames = allUsers.map(user => user.firstName);
         setOptions((prevOptions) => ({
           ...prevOptions,
           ...optionsResponse.data,
-          leadTypeOptions: ["Net New", "SAP Installed Base"],
+          leadTypeOptions: ["Net New", "SAP Installed Base", "PSU's"],
           bdmOptions: bdmNames,
           leadAssignedToOptions: allUsers,
         }));
@@ -276,7 +446,7 @@ const CreateLeads = () => {
   }, []);
 
   useEffect(() => {
-    const userIdFromStorage = localStorage.getItem("userId");
+    const userIdFromStorage = sessionStorage.getItem("userId");
     if (userIdFromStorage) {
       setUserId(userIdFromStorage);
       setFormData((prevData) => ({
@@ -419,6 +589,7 @@ const CreateLeads = () => {
       fileInputRef.current.value = "";
     }
     setErrors({});
+    setDuplicateCompany(null);
   }, []);
 
   const validateForm = useCallback(() => {
@@ -441,13 +612,20 @@ const CreateLeads = () => {
     };
 
     validateSection(companyFormConfig, formData.company, "company");
+    if (duplicateCompany) {
+      newErrors.companyName = `"${duplicateCompany.companyName}" already exists as Lead #${duplicateCompany.leadNumber}${
+        duplicateCompany.owner ? ` (${duplicateCompany.owner})` : ""
+      }. Company name must be unique.`;
+    }
     contactFormConfig.forEach((role) => {
       validateSection(role.fields, formData.contact, "contact");
     });
     Object.entries(itLandscapeConfig).forEach(([section, fields]) => {
       const selectedType = formData.company?.leadType;
-      if (selectedType === "Net New" && section !== "netNew") return;
-      if (selectedType === "SAP Installed Base" && section !== "SAPInstalledBase") return;
+      // Validate only the IT Landscape block that is actually on screen. A lead
+      // type with no block of its own (PSU's) shows neither, so it must not be
+      // held to required fields the user was never given a chance to fill.
+      if (!isLandscapeSectionVisible(section, selectedType)) return;
 
       validateSection(
         fields,
@@ -466,7 +644,7 @@ const CreateLeads = () => {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, file]);
+  }, [formData, file, duplicateCompany]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -502,6 +680,24 @@ const CreateLeads = () => {
         resetForm();
       } catch (error) {
         console.error("Error saving data", error);
+        // The server is the authority on uniqueness — it can reject a name the
+        // type-ahead never flagged (e.g. created by someone else moments ago).
+        if (error.response?.status === 409) {
+          const dup = error.response.data?.duplicate;
+          if (dup) {
+            setDuplicateCompany({
+              companyName: dup.companyName,
+              leadNumber: dup.leadNumber,
+            });
+          }
+          setErrors((prev) => ({
+            ...prev,
+            companyName:
+              error.response.data?.error ||
+              "This company already exists. Company name must be unique.",
+          }));
+          return;
+        }
         alert("Error saving data. Please try again.");
       }
     }
@@ -518,7 +714,17 @@ const CreateLeads = () => {
 
           {companyFormConfig.map((row, rowIndex) => (
             <FormRow key={rowIndex}>
-              {row.map((field) => (
+              {row.map((field) =>
+                field.isPrimary ? (
+                  <CompanyNameField
+                    key={field.name}
+                    field={field}
+                    value={formData.company?.[field.name]}
+                    onChange={(e) => handleChange(e, "company")}
+                    error={errors[field.name]}
+                    onDuplicateChange={handleDuplicateChange}
+                  />
+                ) : (
                 <FormGroup
                   key={field.name}
                   field={field}
@@ -533,7 +739,8 @@ const CreateLeads = () => {
                   onStateSelect={handleStateSelect}
                   onCitySelect={handleCitySelect}
                 />
-              ))}
+                )
+              )}
             </FormRow>
           ))}
         </section>
@@ -637,7 +844,7 @@ const CreateLeads = () => {
             )}
           </div>
           
-          {(!formData.company?.leadType || formData.company?.leadType === "Net New") && (
+          {isLandscapeSectionVisible("netNew", formData.company?.leadType) && (
             <div className="landscape-block">
               <h2>Net New</h2>
 
@@ -781,7 +988,7 @@ const CreateLeads = () => {
             </div>
           )}
 
-          {(!formData.company?.leadType || formData.company?.leadType === "SAP Installed Base") && (
+          {isLandscapeSectionVisible("SAPInstalledBase", formData.company?.leadType) && (
             <div className="landscape-block">
               <h2>SAP Installed Base</h2>
 
