@@ -8,7 +8,7 @@
   margin-bottom: 24px;
 }
 
-h1 {
+.create-leads-container h1 {
   font-size: 20px;
   font-weight: 800;
   color: var(--slate-900);
@@ -20,24 +20,13 @@ h1 {
   display: inline-block;
 }
 
-h1::after {
-  content: '';
-  position: absolute;
-  bottom: -6px;
-  left: 0;
-  width: 44px;
-  height: 3.5px;
-  background: var(--primary-gradient);
-  border-radius: 2px;
-}
-
 .section-subtext {
   font-size: 12.5px;
   color: var(--slate-500);
   margin: 8px 0 0 0;
 }
 
-h2 {
+.create-leads-container h2{
   font-size: 13.5px;
   font-weight: 800;
   color: var(--slate-700);
@@ -110,7 +99,7 @@ h2 {
 }
 
 /* Labels & inputs */
-label {
+.create-leads-container label{
   color: var(--slate-700);
   font-weight: 700;
   font-size: 13px;
@@ -121,9 +110,18 @@ label {
   font-weight: 800;
 }
 
-input,
-select,
-textarea {
+/* Counterpart to .req-star: says a field may be left blank, so a label without
+   a red asterisk does not read as an oversight. */
+.optional-note {
+  color: var(--slate-500, #64748b);
+  font-weight: 500;
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+.create-leads-container input,
+.create-leads-container select,
+.create-leads-container textarea{
   width: 100%;
   padding: 10px 14px;
   border: 1.5px solid var(--slate-300);
@@ -135,15 +133,15 @@ textarea {
   transition: all var(--transition-fast);
 }
 
-input:focus,
-select:focus,
-textarea:focus {
+.create-leads-container input:focus,
+.create-leads-container select:focus,
+.create-leads-container textarea:focus{
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3.5px var(--primary-glow);
 }
 
-select {
+.create-leads-container select{
   appearance: none;
   background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23475569%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
   background-repeat: no-repeat;
@@ -152,11 +150,96 @@ select {
   padding-right: 32px;
 }
 
-select:disabled {
+.create-leads-container select:disabled{
   background-color: var(--slate-100);
   color: var(--slate-400);
   cursor: not-allowed;
   border-color: var(--slate-200);
+}
+
+/* Multi-BDM assignment checkbox dropdown */
+.multiselect-field {
+  position: relative;
+}
+
+.multiselect-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--slate-300);
+  border-radius: var(--radius-xs);
+  background-color: #ffffff;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: var(--slate-900);
+  cursor: pointer;
+  text-align: left;
+  box-sizing: border-box;
+  transition: all var(--transition-fast);
+}
+
+.multiselect-toggle:hover {
+  border-color: var(--slate-400);
+}
+
+.multiselect-toggle.mandatory {
+  border-color: var(--danger);
+}
+
+.multiselect-placeholder {
+  color: var(--slate-400);
+}
+
+.multiselect-caret {
+  color: var(--slate-400);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.multiselect-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--radius-xs);
+  box-shadow: var(--shadow-md);
+  padding: 6px;
+}
+
+.multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--slate-700);
+  cursor: pointer;
+}
+
+.multiselect-option:hover {
+  background: var(--primary-light);
+}
+
+.multiselect-option input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.multiselect-empty {
+  padding: 10px;
+  font-size: 12.5px;
+  color: var(--slate-500);
 }
 
 .select-with-date {
@@ -173,12 +256,12 @@ select:disabled {
   width: 150px;
 }
 
-input[type="date"] {
+.create-leads-container input[type="date"]{
   height: 42px;
   cursor: pointer;
 }
 
-input[type="file"] {
+.create-leads-container input[type="file"]{
   padding: 8px;
   background-color: var(--slate-50);
   border: 1.5px dashed var(--slate-300);
@@ -186,12 +269,12 @@ input[type="file"] {
   border-radius: var(--radius-xs);
 }
 
-input[type="file"]:hover {
+.create-leads-container input[type="file"]:hover{
   background-color: var(--primary-light);
   border-color: var(--primary);
 }
 
-textarea {
+.create-leads-container textarea{
   resize: vertical;
   min-height: 100px;
 }
@@ -317,12 +400,12 @@ textarea {
   cursor: pointer;
   font-size: 15px;
   font-weight: 800;
-  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3);
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
   transition: all var(--transition-fast);
 }
 
 .btn-create-lead-submit:hover {
-  box-shadow: 0 6px 18px rgba(249, 115, 22, 0.42);
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.42);
   transform: translateY(-1px);
 }
 
@@ -368,7 +451,7 @@ textarea {
 }
 
 /* Disabled and blurred styling for conditional fields */
-input:disabled, select:disabled {
+.create-leads-container input:disabled, .create-leads-container select:disabled{
   opacity: 0.55;
   background-color: var(--slate-100) !important;
   cursor: not-allowed;
@@ -445,4 +528,16 @@ input:disabled, select:disabled {
 
 .company-suggestion.is-exact.is-highlighted {
   background: #fee2e2;
+}
+
+/* The "one contact is required" rule spans all three contact blocks, so its
+   message belongs to the section rather than to any single field. */
+.create-leads-container .contact-required-error {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-xs, 6px);
+  font-size: 12.5px;
+  font-weight: 600;
 }

@@ -13,6 +13,7 @@ import {
   faHistory,
   faCalendarAlt,
   faTimes,
+  faUserPlus,
   faBuilding,
   faAlignLeft,
   faChevronDown,
@@ -27,89 +28,14 @@ import axios from "axios";
 import "./HomeToDoWidget.css";
 
 import { API_BASE_URL } from "../../config";
+import { useLiveUpdates } from "../../liveUpdates";
 
-function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = [], isLoadingLeads, onOpenLead }) {
+// addOnly renders just the "Add Task" button and its modal — used by the right
+// rail, where the agenda and task lists were removed and created tasks surface
+// in Lead Follow-ups on the dashboard instead.
+function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = [], isLoadingLeads, onOpenLead, addOnly = false, onTaskCreated }) {
   const userId = sessionStorage.getItem("userId") || "default";
   const todayStr = new Date().toISOString().split("T")[0];
-
-  const yesterdayDate = new Date();
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterdayStr = yesterdayDate.toISOString().split("T")[0];
-
-  const tomorrowDate = new Date();
-  tomorrowDate.setDate(tomorrowDate.getDate() + 3);
-  const tomorrowStr = tomorrowDate.toISOString().split("T")[0];
-
-  // Dummy fallback leads for testing if backend leads API is empty
-  const defaultDummyLeads = [
-    { leadNumber: "1001", companyName: "SAP Enterprise Solutions (TechCorp)" },
-    { leadNumber: "1002", companyName: "Global Logistics & Supply Chain" },
-    { leadNumber: "1003", companyName: "Cloud Matrix IT Infrastructure" },
-    { leadNumber: "1004", companyName: "Nexa Digital Systems" },
-    { leadNumber: "1005", companyName: "Acme Apex Industrial Corp" }
-  ];
-
-  // Initial default tasks pre-populated with dummy data for testing
-  const getInitialTasks = () => {
-    const saved = sessionStorage.getItem(`crm_tasks_${userId}`);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      } catch (e) {
-        console.error("Error parsing saved tasks", e);
-      }
-    }
-    
-    return [
-      {
-        id: "task-1",
-        title: "Follow up with SAP ERP Lead #1002 (Call Back for Proposal)",
-        associatedLead: "SAP Enterprise Solutions (TechCorp)",
-        description: "Client requested updated SLA uptime guarantees and 256-bit encryption compliance documentation before contract signing.",
-        originalDueDate: yesterdayStr,
-        dueDate: yesterdayStr,
-        priority: "High",
-        status: "not_done",
-        category: "Follow-up"
-      },
-      {
-        id: "task-2",
-        title: "Review daily unassigned lead queue and assign to team subusers",
-        associatedLead: "Global Logistics & Supply Chain",
-        description: "Verify incoming lead form entries, check phone numbers, and assign high-turnover accounts to Vaidehi and Tejal.",
-        originalDueDate: todayStr,
-        dueDate: todayStr,
-        priority: "Medium",
-        status: "pending",
-        category: "Management"
-      },
-      {
-        id: "task-3",
-        title: "Prepare weekly CRM pipeline summary report for Admin review",
-        associatedLead: "General / Management",
-        description: "Compile total conversion statistics, supervisor follow-up completion rates, and weekly lead acquisition counts.",
-        originalDueDate: todayStr,
-        dueDate: todayStr,
-        priority: "Low",
-        status: "done",
-        category: "Report"
-      },
-      {
-        id: "task-4",
-        title: "Cloud Matrix Infrastructure SLA demonstration meeting",
-        associatedLead: "Cloud Matrix IT Infrastructure",
-        description: "Rescheduled live demonstration of CRM features and profile password provisions.",
-        originalDueDate: todayStr,
-        dueDate: tomorrowStr,
-        priority: "High",
-        status: "postponed",
-        category: "Meeting"
-      }
-    ];
-  };
 
   const [tasks, setTasks] = useState([]);
 
@@ -135,8 +61,13 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
   useEffect(() => {
     fetchTasksFromDB();
   }, []);
+
+  // A task assigned to you by someone else, or a lead created elsewhere,
+  // appears here immediately rather than on the next page reload.
+  useLiveUpdates(["tasks"], () => fetchTasksFromDB());
+  useLiveUpdates(["leads"], () => fetchLeadsForSelection());
   const [internalSelectedDate, setInternalSelectedDate] = useState(todayStr);
-  const [availableLeads, setAvailableLeads] = useState(defaultDummyLeads);
+  const [availableLeads, setAvailableLeads] = useState([]);
   const [activeFilter, setActiveFilter] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
   const [postponeTaskId, setPostponeTaskId] = useState(null);
@@ -144,6 +75,7 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
   const [expandedTaskIds, setExpandedTaskIds] = useState({});
 
   const [newTask, setNewTask] = useState({
+    assignedTo: "",
     title: "",
     associatedLead: "",
     description: "",
@@ -152,6 +84,9 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
     category: "General"
   });
 
+  // People this user may hand work to. Empty for anyone with no reports, in
+  // which case the Assign to control is not rendered at all.
+  const [assignableUsers, setAssignableUsers] = useState([]);
   const [systemLeads, setSystemLeads] = useState([]);
   const [isLoadingSystemLeads, setIsLoadingSystemLeads] = useState(true);
   const [localSelectedLead, setLocalSelectedLead] = useState(null);
@@ -173,8 +108,9 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
           leadNumber: l.leadNumber,
           companyName: l.companyInfo?.companyName || `Lead #${l.leadNumber}`
         }));
-        // Merge with default dummy leads so testing always has options
-        setAvailableLeads([...mapped, ...defaultDummyLeads]);
+        // Only real leads. Invented placeholders used to be merged in here,
+        // which let people attach work to companies that do not exist.
+        setAvailableLeads(mapped);
       }
     } catch (err) {
       console.error("Error fetching leads for task creation:", err);
@@ -318,6 +254,48 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
   };
 
   // Add new task
+  const loadAssignable = async () => {
+    try {
+      const token = sessionStorage.getItem("token");
+      const res = await axios.get(`${API_BASE_URL}/api/assignable-users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAssignableUsers(res.data || []);
+    } catch (err) {
+      setAssignableUsers([]);
+    }
+  };
+
+  useEffect(() => {
+    loadAssignable();
+  }, []);
+
+  // Refresh both dropdowns each time the modal opens. They used to load once
+  // when the dashboard mounted, so a lead created during the session — or a
+  // colleague added to your team — did not appear until a full page reload.
+  // Escape closes the dialog, and the page behind it is locked from scrolling
+  // while it is open.
+  useEffect(() => {
+    if (!showAddModal) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setShowAddModal(false);
+    };
+    window.addEventListener('keydown', onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showAddModal]);
+
+  useEffect(() => {
+    if (!showAddModal) return;
+    fetchLeadsForSelection();
+    loadAssignable();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAddModal]);
+
   const handleAddTaskSubmit = async (e) => {
     e.preventDefault();
     if (!newTask.title.trim()) return;
@@ -333,13 +311,17 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
         dueDate: newTask.dueDate || todayStr,
         priority: newTask.priority,
         category: newTask.category,
-        status: "pending"
+        status: "pending",
+        // Omitted entirely when unset, so the server keeps the task with the
+        // creator rather than being handed a null it has to interpret.
+        ...(newTask.assignedTo ? { assignedTo: Number(newTask.assignedTo) } : {})
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       setTasks((prev) => [res.data, ...prev]);
       setNewTask({
+        assignedTo: "",
         title: "",
         associatedLead: "",
         description: "",
@@ -348,6 +330,9 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
         category: "General"
       });
       setShowAddModal(false);
+      // Let the owner refresh shared state so the new task shows up wherever
+      // else it is listed (the dashboard's Lead Follow-ups panel).
+      if (onTaskCreated) onTaskCreated(res.data);
     } catch (err) {
       console.error("Error adding task:", err);
     }
@@ -374,8 +359,12 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
         <div className="widget-title-group">
           <FontAwesomeIcon icon={faListCheck} className="widget-header-icon" />
           <div>
-            <h3>Schedule Agenda & To-Do List</h3>
-            <p>View follow-ups and manage daily tasks in one unified dashboard.</p>
+            <h3>{addOnly ? "Tasks" : "Schedule Agenda & To-Do List"}</h3>
+            <p>
+              {addOnly
+                ? "New tasks appear in Lead Follow-ups on the dashboard."
+                : "View follow-ups and manage daily tasks in one unified dashboard."}
+            </p>
           </div>
         </div>
 
@@ -390,14 +379,25 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
 
       {/* Pop-up Modal Window for Creating New Task — rendered via Portal to escape overflow:hidden parent */}
       {showAddModal && ReactDOM.createPortal(
-        <div className="add-task-modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="add-task-modal-dialog" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="add-task-modal-overlay"
+          onClick={() => setShowAddModal(false)}
+        >
+          <div
+            className="add-task-modal-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-task-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header-bar">
               <div className="modal-title-box">
-                <FontAwesomeIcon icon={faListCheck} className="modal-title-icon" />
+                <span className="modal-title-icon">
+                  <FontAwesomeIcon icon={faListCheck} />
+                </span>
                 <div>
-                  <h3>Create New Work Task</h3>
-                  <p>Select a lead, enter task description, and assign action schedule</p>
+                  <h3 id="add-task-title">New task</h3>
+                  <p>Capture what needs doing, and when.</p>
                 </div>
               </div>
               <button
@@ -405,94 +405,196 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
                 className="btn-modal-close"
                 onClick={() => setShowAddModal(false)}
                 title="Close"
+                aria-label="Close"
               >
                 <FontAwesomeIcon icon={faTimes} />
               </button>
             </div>
 
             <form onSubmit={handleAddTaskSubmit} className="add-task-modal-form">
-              {/* Select Associated Lead Dropdown */}
-              <div className="modal-form-group">
-                <label><FontAwesomeIcon icon={faBuilding} className="label-icon" /> Select Associated Lead</label>
-                <select
-                  value={newTask.associatedLead}
-                  onChange={(e) => setNewTask({ ...newTask, associatedLead: e.target.value })}
-                  className="modal-input-select"
-                >
-                  <option value="">-- General Work (No Specific Lead) --</option>
-                  {availableLeads.map((l, idx) => (
-                    <option key={idx} value={l.companyName}>
-                      {l.companyName} (Lead #{l.leadNumber})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Task Title Input */}
-              <div className="modal-form-group">
-                <label>Task Title / Title Name <span className="req-star">*</span></label>
-                <input
-                  type="text"
-                  placeholder="e.g. Follow up with SAP ERP lead for contract signing..."
-                  value={newTask.title}
-                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                  required
-                  className="modal-input-text"
-                  autoFocus
-                />
-              </div>
-
-              {/* Task Description Textarea */}
-              <div className="modal-form-group">
-                <label><FontAwesomeIcon icon={faAlignLeft} className="label-icon" /> Task Description & Action Notes</label>
-                <textarea
-                  placeholder="Enter detailed action plan, call notes, or instructions for this task..."
-                  value={newTask.description}
-                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                  rows={3}
-                  className="modal-input-textarea"
-                />
-              </div>
-
-              {/* Form Grid: Due Date, Priority, Category */}
-              <div className="modal-form-grid">
+              <div className="modal-scroll-body">
+                {/* The task itself first: the title is what the list shows and
+                    what people actually came here to type. */}
                 <div className="modal-form-group">
-                  <label>Due Date <span className="req-star">*</span></label>
+                  <label htmlFor="task-title">
+                    Task title <span className="req-star">*</span>
+                  </label>
                   <input
-                    type="date"
-                    value={newTask.dueDate}
-                    onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                    id="task-title"
+                    type="text"
+                    placeholder="e.g. Follow up with SAP ERP lead for contract signing"
+                    value={newTask.title}
+                    onChange={(e) =>
+                      setNewTask({ ...newTask, title: e.target.value })
+                    }
                     required
-                    className="modal-input-select"
+                    className="modal-input-text"
+                    autoFocus
                   />
                 </div>
 
                 <div className="modal-form-group">
-                  <label>Priority Level</label>
-                  <select
-                    value={newTask.priority}
-                    onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                    className="modal-input-select"
-                  >
-                    <option value="High">High Priority</option>
-                    <option value="Medium">Medium Priority</option>
-                    <option value="Low">Low Priority</option>
-                  </select>
+                  <label htmlFor="task-desc">
+                    <FontAwesomeIcon icon={faAlignLeft} className="label-icon" />
+                    Details <span className="modal-optional">optional</span>
+                  </label>
+                  <textarea
+                    id="task-desc"
+                    placeholder="Action plan, call notes, or instructions..."
+                    value={newTask.description}
+                    onChange={(e) =>
+                      setNewTask({ ...newTask, description: e.target.value })
+                    }
+                    rows={3}
+                    className="modal-input-textarea"
+                  />
+                </div>
+
+                <div className="modal-section-divider">
+                  <span>Link &amp; assign</span>
                 </div>
 
                 <div className="modal-form-group">
-                  <label>Work Category</label>
+                  <label htmlFor="task-lead">
+                    <FontAwesomeIcon icon={faBuilding} className="label-icon" />
+                    Associated lead
+                  </label>
                   <select
-                    value={newTask.category}
-                    onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
+                    id="task-lead"
+                    value={newTask.associatedLead}
+                    onChange={(e) =>
+                      setNewTask({ ...newTask, associatedLead: e.target.value })
+                    }
                     className="modal-input-select"
                   >
-                    <option value="Follow-up">Follow-up</option>
-                    <option value="Management">Management</option>
-                    <option value="Report">Report</option>
-                    <option value="Meeting">Meeting</option>
-                    <option value="General">General</option>
+                    <option value="">General work - no specific lead</option>
+                    {availableLeads.map((l, idx) => (
+                      <option key={idx} value={l.companyName}>
+                        {l.companyName} (Lead #{l.leadNumber})
+                      </option>
+                    ))}
                   </select>
+                  {!isLoadingSystemLeads && availableLeads.length === 0 && (
+                    <span className="modal-field-note">
+                      No leads are visible to you yet. Create one first, or ask
+                      for one to be assigned to you.
+                    </span>
+                  )}
+                </div>
+
+                {/* Assign downward. Shown to anyone with people below them; for
+                    everyone else it says so rather than disappearing, which
+                    read as the control being broken. */}
+                <div className="modal-form-group">
+                  <label htmlFor="task-assignee">
+                    <FontAwesomeIcon icon={faUserPlus} className="label-icon" />
+                    Assign to
+                  </label>
+                  {assignableUsers.length > 0 ? (
+                    <select
+                      id="task-assignee"
+                      value={newTask.assignedTo}
+                      onChange={(e) =>
+                        setNewTask({ ...newTask, assignedTo: e.target.value })
+                      }
+                      className="modal-input-select"
+                    >
+                      <option value="">Myself</option>
+                      {assignableUsers.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.firstName} {u.lastName}
+                          {u.designation ? " - " + u.designation : ""}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <>
+                      <select className="modal-input-select" value="" disabled>
+                        <option value="">Myself</option>
+                      </select>
+                      <span className="modal-field-note">
+                        You have no team members to assign work to, so this task
+                        will be your own.
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <div className="modal-section-divider">
+                  <span>Schedule</span>
+                </div>
+
+                <div className="modal-form-grid">
+                  <div className="modal-form-group">
+                    <label htmlFor="task-due">
+                      <FontAwesomeIcon
+                        icon={faCalendarDay}
+                        className="label-icon"
+                      />
+                      Due date <span className="req-star">*</span>
+                    </label>
+                    <input
+                      id="task-due"
+                      type="date"
+                      value={newTask.dueDate}
+                      onChange={(e) =>
+                        setNewTask({ ...newTask, dueDate: e.target.value })
+                      }
+                      required
+                      className="modal-input-select"
+                    />
+                  </div>
+
+                  <div className="modal-form-group">
+                    <label htmlFor="task-category">Category</label>
+                    <select
+                      id="task-category"
+                      value={newTask.category}
+                      onChange={(e) =>
+                        setNewTask({ ...newTask, category: e.target.value })
+                      }
+                      className="modal-input-select"
+                    >
+                      <option value="Follow-up">Follow-up</option>
+                      <option value="Management">Management</option>
+                      <option value="Report">Report</option>
+                      <option value="Meeting">Meeting</option>
+                      <option value="General">General</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Priority as three buttons rather than a dropdown: it has
+                    only three values and is set on nearly every task, so the
+                    extra click a select costs is not worth it. */}
+                <div className="modal-form-group">
+                  <label>Priority</label>
+                  <div
+                    className="priority-segmented"
+                    role="group"
+                    aria-label="Priority"
+                  >
+                    {["High", "Medium", "Low"].map((level) => (
+                      <button
+                        key={level}
+                        type="button"
+                        className={
+                          "priority-option prio-" +
+                          level.toLowerCase() +
+                          (newTask.priority === level ? " is-selected" : "")
+                        }
+                        aria-pressed={newTask.priority === level}
+                        onClick={() =>
+                          setNewTask({ ...newTask, priority: level })
+                        }
+                      >
+                        {level === "High" && (
+                          <FontAwesomeIcon icon={faExclamationCircle} />
+                        )}
+                        <span>{level}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -504,8 +606,12 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-modal-save">
-                  <FontAwesomeIcon icon={faPlus} /> Save Task
+                <button
+                  type="submit"
+                  className="btn-modal-save"
+                  disabled={!newTask.title.trim()}
+                >
+                  <FontAwesomeIcon icon={faPlus} /> Create task
                 </button>
               </div>
             </form>
@@ -515,6 +621,7 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
       )}
 
       {/* Split Pane Content Container */}
+      {!addOnly && (
       <div className="todo-widget-content-split">
         {/* Left Pane: Selected Date Lead Follow-ups */}
         <div className="agenda-pane">
@@ -786,6 +893,7 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
           </div>
         </div>
       </div>
+      )}
       {localSelectedLead && (
         <LeadDetails
           leadNumber={localSelectedLead}

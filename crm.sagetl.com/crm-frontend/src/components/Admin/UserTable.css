@@ -38,17 +38,6 @@
   display: inline-block;
 }
 
-.user-heading::after {
-  content: '';
-  position: absolute;
-  bottom: -6px;
-  left: 0;
-  width: 40px;
-  height: 3px;
-  background: var(--primary-gradient);
-  border-radius: 2px;
-}
-
 /* Form layout */
 .user-form {
   display: flex;
@@ -95,6 +84,60 @@
   box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
+/* Why the save failed, in the form itself rather than a browser alert. */
+.user-form-error {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1.5px solid #fecaca;
+  border-left-width: 4px;
+  border-radius: var(--radius-sm);
+  background-color: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.user-form-loading {
+  padding: 24px 4px;
+  font-size: 13.5px;
+  color: var(--slate-500);
+  text-align: center;
+}
+
+/* Password field + its show/hide eye. The wrapper takes over the flex sizing
+   the input used to have as a direct child of the row. */
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 200px;
+}
+
+.password-input-wrap input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.toggle-password-btn {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: var(--slate-500);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  border-radius: var(--radius-sm);
+}
+
+.toggle-password-btn:hover {
+  color: var(--slate-700);
+}
+
 /* Action button buttons */
 .full-width {
   display: flex;
@@ -121,13 +164,13 @@
 .edit-btn {
   background: var(--primary-gradient);
   color: white;
-  box-shadow: 0 4px 12px rgba(211, 100, 11, 0.2);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
 }
 
 .create-user-btn:hover,
 .add-usr-btn:hover,
 .edit-btn:hover {
-  box-shadow: 0 6px 16px rgba(211, 100, 11, 0.35);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
   transform: translateY(-1px);
 }
 
@@ -233,4 +276,139 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
+}
+
+/* ---- table refinements ----
+   The header row read as one run of words ("Status Actions") because every
+   column was auto-sized off its content. Fixed widths for the short columns
+   let the name and email columns take the slack. */
+.user-table {
+  table-layout: auto;
+}
+
+.user-table th:nth-child(1),
+.user-table td:nth-child(1),
+.user-table th:nth-child(2),
+.user-table td:nth-child(2) {
+  width: 15%;
+  white-space: nowrap;
+}
+
+.user-table th:nth-child(3),
+.user-table td:nth-child(3) {
+  width: auto;
+  overflow-wrap: anywhere;
+}
+
+.user-table th:nth-child(4),
+.user-table td:nth-child(4),
+.user-table th:nth-child(5),
+.user-table td:nth-child(5) {
+  width: 110px;
+  white-space: nowrap;
+}
+
+/* Actions sit hard right, where the eye expects them. */
+.user-table th:last-child,
+.user-table td:last-child {
+  width: 110px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Status as a quiet pill rather than bare lowercase text. */
+.user-table td .status-cell {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--success-bg, #ecfdf5);
+  color: var(--success-hover, #047857);
+}
+
+.user-table td .status-cell.is-inactive {
+  background: var(--slate-100);
+  color: var(--slate-500);
+}
+
+/* The action buttons were oversized slabs; size them to their text. */
+.user-table td .edit-btn,
+.user-table td .delete-btn {
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  border-radius: 8px;
+  min-width: 0;
+}
+
+/* Delete is destructive, so it reads as an outline until hovered rather than
+   sitting next to Edit as an equal-weight solid button. */
+.user-table td .delete-btn {
+  margin-left: 8px;
+  background: #ffffff;
+  color: var(--danger-hover, #b91c1c);
+  border: 1px solid var(--danger-border, #fecaca);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition-fast);
+}
+
+.user-table td .delete-btn:hover:not(:disabled) {
+  background: var(--danger, #dc2626);
+  border-color: var(--danger, #dc2626);
+  color: #ffffff;
+}
+
+.user-table td .delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Why a delete was refused (owns leads, has reports) goes here. */
+.user-table-error {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-xs, 6px);
+  color: var(--danger-hover);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* Confirmation of an action that already completed — the in-app replacement
+   for the blocking alert() that used to announce it. */
+.user-table-notice {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: var(--radius-xs, 6px);
+  color: #047857;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* Body copy inside the delete confirmation dialog. */
+.confirm-dialog-text {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--slate-700);
+}
+
+.confirm-dialog-hint {
+  color: var(--slate-500);
+  font-size: 12.5px;
+}
+
+/* Guidance under a form field (e.g. the password policy on Add User). */
+.field-hint {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--slate-500);
+}

@@ -1,0 +1,185 @@
+.perm-page {
+  padding: 16px 20px;
+  max-width: 1300px;
+  margin: 0 auto;
+  text-align: left;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.perm-head h1 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--slate-900);
+  margin: 0;
+  letter-spacing: -0.4px;
+}
+
+.perm-head h1 svg {
+  font-size: 18px;
+  color: var(--primary);
+}
+
+.perm-head p {
+  font-size: 13px;
+  color: var(--slate-500);
+  margin: 4px 0 0 0;
+  max-width: 760px;
+}
+
+.perm-error {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-hover);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+.perm-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--info-bg, #f0f9ff);
+  border: 1px solid var(--info-border, #bae6fd);
+  color: var(--info-hover, #0369a1);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+.perm-panel {
+  background: #ffffff;
+  border: 1px solid var(--slate-200);
+  border-radius: 12px;
+  padding: 4px;
+  box-sizing: border-box;
+  overflow-x: auto;
+}
+
+/* Matrix: Executives down the side, Managers across the top. */
+.perm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.perm-table th,
+.perm-table td {
+  border-bottom: 1px solid var(--slate-100);
+  padding: 10px 12px;
+}
+
+.perm-corner {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--slate-400);
+  /* The name column stays put while the manager columns scroll. */
+  position: sticky;
+  left: 0;
+  background: #ffffff;
+  z-index: 2;
+  min-width: 190px;
+}
+
+.perm-manager {
+  display: table-cell;
+  text-align: center;
+  vertical-align: bottom;
+  min-width: 120px;
+}
+
+.perm-manager-name {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--slate-800);
+}
+
+.perm-manager-count {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--slate-400);
+  margin-top: 2px;
+}
+
+.perm-exec {
+  text-align: left;
+  font-weight: 600;
+  color: var(--slate-800);
+  position: sticky;
+  left: 0;
+  background: #ffffff;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.perm-inactive {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--slate-100);
+  color: var(--slate-500);
+}
+
+.perm-table td {
+  text-align: center;
+}
+
+.perm-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.perm-cell input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.perm-cell input:disabled {
+  cursor: default;
+}
+
+/* A direct report is implied by the reporting tree, not granted here. */
+.perm-table td.is-direct {
+  background: var(--primary-light);
+}
+
+.perm-direct {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--primary);
+}
+
+.perm-empty {
+  font-size: 12.5px;
+  color: var(--slate-400);
+  margin: 0;
+}
+
+.perm-foot {
+  font-size: 11.5px;
+  color: var(--slate-400);
+  margin: 0;
+  max-width: 760px;
+}

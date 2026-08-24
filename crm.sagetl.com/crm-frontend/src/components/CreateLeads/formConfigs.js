@@ -26,17 +26,18 @@ export const companyFormConfig = [
     {
       name: "leadAssignedTo",
       label: "Lead Assigned to",
-      type: "select",
+      type: "multiselect",
       options: "leadAssignedToOptions",
     },
   ],
   [
-    { name: "bdm", label: "BDM", type: "select", options: "bdmOptions" },
+    { name: "bdm", label: "BDM", type: "multiselect", options: "bdmOptions" },
     {
       name: "leadStatus",
       label: "Lead Status",
       type: "select",
       options: "leadStatusOptions",
+      required: true,
     },
     {
       name: "leadSource",
@@ -58,6 +59,7 @@ export const companyFormConfig = [
       label: "Next Action",
       type: "select",
       options: "nextActionOptions",
+      required: true,
       datePicker: { name: "dateField", label: "Date" },
     },
     {
@@ -65,6 +67,26 @@ export const companyFormConfig = [
       label: "Lead Usable",
       type: "select",
       options: "leadUsableOptions",
+      required: true,
+    },
+  ],
+  [
+    {
+      // Read by the pipeline for deal values. It had no input anywhere, which
+      // is why every money figure in the app read zero.
+      name: "expectedDealValue",
+      label: "Expected Deal Value (INR)",
+      type: "number",
+      required: true,
+    },
+    {
+      // The pipeline used to infer the stage from nextAction, so scheduling a
+      // call silently moved a lead between columns. Stored explicitly now, with
+      // the old inference kept as a fallback for records that predate this.
+      name: "pipelineStage",
+      label: "Pipeline Stage",
+      type: "select",
+      options: "pipelineStageOptions",
     },
   ],
   [
@@ -149,6 +171,7 @@ export const itLandscapeConfig = {
         label: "Using ERP",
         type: "select",
         options: "usingERPOptions",
+        required: true,
       },
       { name: "budget", label: "Budget", type: "text" },
       {
@@ -156,6 +179,7 @@ export const itLandscapeConfig = {
         label: "Opportunity",
         type: "select",
         options: "opportunityOptions",
+        required: true,
       },
     ],
     [
@@ -201,6 +225,7 @@ export const itLandscapeConfig = {
         label: "Opportunity for us available",
         type: "select",
         options: "opportunityOptions",
+        required: true,
       },
       {
         name: "yearOfImplementation",
@@ -218,8 +243,9 @@ export const itLandscapeConfig = {
       {
         name: "contractExpiry",
         label: "Contract Expiry",
-        type: "select",
-        options: "expiryOptions",
+        // A real date, not a year: the monthly "expiring in the next three
+        // months" report cannot be computed from a year alone.
+        type: "date",
       },
       {
         name: "supportPartner",
@@ -234,6 +260,7 @@ export const itLandscapeConfig = {
         label: "Opportunity for",
         type: "select",
         options: "opportunityForUs3Options",
+        required: true,
       },
       {
         name: "exactVersion",

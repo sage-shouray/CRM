@@ -15,8 +15,26 @@
     gap: 8px;
     font-family: inherit;
     box-sizing: border-box;
-    height: calc((100vh - 56px) / var(--dash-scale));
+    /* Fill the content area, whatever height it happens to be. This used to
+       subtract a hard-coded 56px for the top bar — which is wrong the moment
+       the bar wraps to two rows on a narrow screen, and pushed the layout off
+       the bottom. Divided by the scale so zoom does not overshoot. */
+    height: calc(100% / var(--dash-scale));
     overflow: hidden;
+}
+
+/* Small laptops: scale the dashboard down a little so the single-screen layout
+   still fits once the two rails have taken their share of the width. */
+@media (max-width: 1439px) {
+    .home-dashboard-container.compact-dashboard { --dash-scale: 0.94; }
+}
+
+@media (max-width: 1300px) {
+    .home-dashboard-container.compact-dashboard { --dash-scale: 0.88; }
+}
+
+@media (max-width: 1180px) {
+    .home-dashboard-container.compact-dashboard { --dash-scale: 0.84; }
 }
 
 /* Large laptop / small desktop */
@@ -86,7 +104,7 @@
 }
 
 .role-badge-text {
-    color: #f97316;
+    color: var(--primary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -233,8 +251,8 @@
 }
 
 .icon-orange {
-    background: #fff7ed;
-    color: #ea580c;
+    background: var(--primary-light);
+    color: var(--primary-hover);
 }
 
 .icon-blue {
@@ -266,9 +284,11 @@
 }
 
 /* 2-Column Single Screen Dashboard Grid */
+/* Single column since the calendar moved to the sidebar — the agenda and
+   to-do widget now take the full width of the content area. */
 .dashboard-three-column-grid {
     display: grid;
-    grid-template-columns: 1.25fr 2.05fr;
+    grid-template-columns: 1fr;
     gap: 20px;
     align-items: stretch;
     flex: 1;
@@ -323,9 +343,9 @@
 
 .agenda-header-icon {
     font-size: 15px;
-    color: #f97316;
-    background: #fff7ed;
-    border: 1px solid #ffedd5;
+    color: var(--primary);
+    background: var(--primary-light);
+    border: 1px solid var(--primary-border);
     padding: 10px;
     border-radius: 8px;
     flex-shrink: 0;
@@ -576,24 +596,33 @@
 
 .btn-view-lead:hover {
     background: var(--primary);
-    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
 }
 
 /* Responsive Grid Breakpoints */
 @media (max-width: 1280px) {
     .dashboard-three-column-grid {
-        /* Give the calendar a little less room before it has to stack */
-        grid-template-columns: 1fr 1.8fr;
         gap: 14px;
     }
 }
 
 /* Tablet and below: stack the columns and let the page scroll normally
    instead of forcing everything into one clipped viewport. */
+/* At this width the rails stop being columns and stack above the content, so
+   the whole body scrolls as one. A fixed-height dashboard inside a scrolling
+   column has nothing to measure against, so it takes its natural height. */
+@media (max-width: 1100px) {
+    .home-dashboard-container.compact-dashboard {
+        --dash-scale: 1;
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+    }
+}
+
 @media (max-width: 1024px) {
     .home-dashboard-container.compact-dashboard {
         height: auto;
-        min-height: calc(100vh - 56px);
         overflow: visible;
     }
 
@@ -630,4 +659,586 @@
     .grid-col.col-calendar {
         min-height: 360px;
     }
+}
+
+/* ===========================================================================
+   WORKSPACE DASHBOARD - three-column layout
+   =========================================================================== */
+.workspace-title {
+    margin: 2px 0 8px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--slate-500);
+    flex-shrink: 0;
+}
+
+/* Everything sits in ONE row that exactly fills the remaining viewport
+   height. Nothing scrolls at page level; each panel scrolls its own list. */
+/* Headline metric strip above the workspace. */
+.kpi-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    flex: 0 0 auto;
+}
+
+.kpi-card {
+    /* Grid items default to min-width:auto; without this a long label widens
+       its track and squeezes the others out of the row. */
+    min-width: 0;
+    background: #ffffff;
+    border: 1px solid var(--slate-200);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+    box-sizing: border-box;
+    transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.kpi-card:hover {
+    border-color: var(--slate-300);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.kpi-card.is-alert {
+    border-color: var(--warning-border, #fed7aa);
+    background: var(--warning-bg, #fff7ed);
+}
+
+.kpi-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--slate-500);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kpi-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--slate-900);
+    letter-spacing: -0.5px;
+    line-height: 1.15;
+}
+
+.kpi-card.is-alert .kpi-value {
+    color: var(--warning-hover, #c2410c);
+}
+
+/* Three tiles, one line. They hold a short label and a number, so they stay
+   readable well below the width at which they used to wrap to a second row. */
+@media (max-width: 620px) {
+    .kpi-row { grid-template-columns: 1fr; }
+}
+
+/* Single column: the pipeline funnel moved to its own page, leaving the lead
+   follow-up list to use the full width of the content area. */
+.workspace-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
+    overflow: hidden;
+}
+
+.wd-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    /* Fill the row exactly; internal lists do the scrolling. */
+    height: 100%;
+    min-height: 0;
+    background: #ffffff;
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.wd-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--slate-100);
+    flex-shrink: 0;
+}
+
+.wd-panel-head h2 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--slate-900);
+}
+
+.wd-panel-count {
+    font-size: 11px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    background: var(--primary-light);
+    color: var(--primary-hover);
+    border: 1px solid var(--primary-border);
+}
+
+.wd-empty {
+    margin: 10px 0;
+    font-size: 12.5px;
+    color: var(--slate-500);
+}
+
+/* ---- filter chips ---- */
+.wd-filters {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--slate-100);
+    flex-shrink: 0;
+}
+
+.wd-filters-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--slate-500);
+    margin-right: 2px;
+}
+
+.wd-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--slate-600);
+    background: var(--slate-50);
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.wd-chip:hover { border-color: var(--primary-border); }
+
+.wd-chip.is-active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #ffffff;
+}
+
+.wd-chip.is-alert:not(.is-active) {
+    color: var(--danger);
+    border-color: var(--danger-border);
+}
+
+.wd-chip-count {
+    font-size: 10px;
+    padding: 0 5px;
+    border-radius: var(--radius-full);
+    background: rgba(15, 23, 42, 0.08);
+}
+
+.wd-chip.is-active .wd-chip-count { background: rgba(255, 255, 255, 0.28); }
+
+/* ---- lead cards ---- */
+.wd-lead-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.wd-lead-card {
+    border: 1px solid var(--slate-200);
+    border-left: 3px solid var(--primary);
+    border-radius: var(--radius-sm);
+    padding: 10px 11px;
+    background: var(--slate-50);
+    transition: all var(--transition-fast);
+}
+
+.wd-lead-card:hover { box-shadow: var(--shadow-sm); background: #ffffff; }
+
+/* The left stripe reads priority: red high, amber medium, blue low. Overdue is
+   signalled by the tinted background and the red date text instead, so a
+   medium-priority card never looks high just because it slipped. */
+.wd-lead-card.prio-high { border-left-color: var(--danger); }
+.wd-lead-card.prio-medium { border-left-color: var(--warning, #f59e0b); }
+.wd-lead-card.prio-low { border-left-color: var(--info, #0284c7); }
+.wd-lead-card.is-overdue { background: var(--danger-bg); }
+
+.wd-lead-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.wd-lead-id { display: flex; gap: 8px; min-width: 0; }
+
+.wd-lead-id svg {
+    color: var(--primary);
+    font-size: 13px;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.wd-lead-id h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--slate-900);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wd-lead-sub { margin: 1px 0 0; font-size: 11px; color: var(--slate-500); }
+
+.wd-lead-badges {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.wd-badge {
+    font-size: 9.5px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: var(--radius-full);
+    background: var(--slate-200);
+    color: var(--slate-700);
+    white-space: nowrap;
+}
+
+.wd-badge.is-high { background: var(--danger-bg); color: var(--danger-hover); }
+.wd-badge.is-medium { background: var(--warning-bg); color: var(--warning-hover); }
+.wd-badge.is-low { background: var(--info-bg); color: var(--info); }
+.wd-badge.is-value { background: var(--success-bg); color: var(--success-hover); }
+
+.wd-lead-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 7px;
+    font-size: 11px;
+    color: var(--slate-600);
+}
+
+.wd-lead-meta svg { font-size: 10px; margin-right: 3px; color: var(--slate-400); }
+.wd-lead-meta .is-alert { color: var(--danger); font-weight: 700; }
+
+.wd-lead-actions { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+
+.wd-lead-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--slate-700);
+    background: #ffffff;
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.wd-lead-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+.wd-lead-btn.is-primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #ffffff;
+}
+
+.wd-lead-btn.is-primary:hover { background: var(--primary-hover); color: #ffffff; }
+
+/* ---- pipeline funnel ---- */
+.wd-pipeline-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 12px; }
+
+.wd-funnel { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+
+.wd-funnel-row { width: 100%; display: flex; align-items: center; gap: 10px; }
+
+/* Bar lives in its own flexible track; the label column is fixed so it can
+   never be pushed off the panel by a full-width bar. */
+.wd-funnel-track { flex: 1; min-width: 0; display: flex; justify-content: center; }
+.wd-funnel-meta { width: 104px; flex-shrink: 0; }
+
+.wd-funnel-bar {
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #3730a3 0%, #6366f1 100%);
+    color: #ffffff;
+    flex-shrink: 0;
+    transition: filter var(--transition-fast);
+}
+
+.wd-funnel-bar:hover { filter: brightness(1.12); }
+.wd-funnel-bar.is-won { background: linear-gradient(135deg, #047857 0%, #10b981 100%); }
+.wd-funnel-count { font-size: 12.5px; font-weight: 800; }
+
+.wd-funnel-meta { display: flex; flex-direction: column; }
+
+.wd-funnel-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--slate-700);
+    line-height: 1.2;
+}
+
+.wd-funnel-value { font-size: 10.5px; color: var(--slate-500); }
+
+/* ---- health gauge ---- */
+.wd-gauge {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--slate-100);
+    text-align: center;
+}
+
+.wd-gauge-dial {
+    position: relative;
+    width: 128px;
+    height: 64px;
+    margin: 0 auto;
+    border-radius: 128px 128px 0 0;
+    background: conic-gradient(from 270deg at 50% 100%,
+        var(--danger) 0deg, var(--warning) 45deg, var(--success) 90deg, transparent 90deg);
+    overflow: hidden;
+}
+
+.wd-gauge-dial::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 84px;
+    height: 42px;
+    transform: translateX(-50%);
+    background: #ffffff;
+    border-radius: 84px 84px 0 0;
+}
+
+.wd-gauge-needle {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 2px;
+    height: 54px;
+    background: var(--slate-900);
+    transform-origin: bottom center;
+    border-radius: 2px;
+    z-index: 2;
+    transition: transform var(--transition-normal);
+}
+
+.wd-gauge-readout { margin-top: 8px; display: flex; flex-direction: column; }
+.wd-gauge-readout strong { font-size: 20px; font-weight: 800; color: var(--slate-900); }
+.wd-gauge-readout span { font-size: 11px; color: var(--slate-500); font-weight: 700; }
+.wd-gauge.is-good .wd-gauge-readout strong { color: var(--success-hover); }
+.wd-gauge.is-warn .wd-gauge-readout strong { color: var(--warning-hover); }
+.wd-gauge.is-bad .wd-gauge-readout strong { color: var(--danger); }
+
+.wd-gauge-note { margin: 6px 0 0; font-size: 10.5px; color: var(--slate-500); line-height: 1.35; }
+
+/* ---- stat tiles ---- */
+.wd-stats {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--slate-100);
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.wd-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 9px 10px;
+    background: var(--slate-50);
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radius-sm);
+    min-width: 0;
+}
+
+.wd-stat-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--slate-500);
+}
+
+.wd-stat-value { font-size: 17px; font-weight: 800; color: var(--slate-900); }
+.wd-stat-value.is-alert { color: var(--danger); }
+.wd-stat-sub { font-size: 10px; color: var(--slate-500); }
+
+/* The to-do widget supplies its own card chrome inside this column. */
+.wd-panel.wd-tasks {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* The widget normally puts follow-ups and work tasks side by side, which
+   needs ~600px. In a dashboard column it stacks instead, each pane scrolling
+   on its own so the column never grows past the frame. */
+.wd-tasks .home-todo-card { height: 100%; min-height: 0; }
+
+.wd-tasks .todo-widget-content-split {
+    flex-direction: column;
+    gap: 10px;
+    height: calc(100% - 44px);
+    min-height: 0;
+}
+
+/* The agenda pane is empty on most days, so give the task list the larger
+   share rather than splitting the column evenly. */
+.wd-tasks .agenda-pane {
+    flex: 0.75 1 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.wd-tasks .tasks-pane {
+    flex: 1.45 1 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 1250px) {
+    .workspace-grid { grid-template-columns: 1fr; overflow-y: auto; }
+    .wd-panel { min-height: 380px; }
+}
+
+@media (max-width: 900px) {
+    .workspace-grid { grid-template-columns: 1fr; overflow-y: auto; }
+}
+
+/* ---- task rows inside Lead Follow-ups ----
+   Same card shell as a lead so the list reads as one queue, tinted and tagged
+   so a task is never mistaken for a company. */
+.wd-lead-card.is-task {
+    border-left: 3px solid var(--info, #0284c7);
+    background: rgba(2, 132, 199, 0.03);
+}
+
+.wd-badge.is-task-tag {
+    background: var(--info-bg, #f0f9ff);
+    color: var(--info-hover, #0369a1);
+    border: 1px solid var(--info-border, #bae6fd);
+}
+
+.wd-task-desc {
+    margin: 4px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--slate-600);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ---- done / postpone controls on follow-up cards ---- */
+.wd-lead-btn.is-done {
+    background: var(--success-bg, #ecfdf5);
+    border-color: var(--success-border, #a7f3d0);
+    color: var(--success-hover, #047857);
+}
+
+.wd-lead-btn.is-done:hover:not(:disabled) {
+    background: var(--success, #059669);
+    border-color: var(--success, #059669);
+    color: #ffffff;
+}
+
+.wd-lead-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Inline date picker, revealed under the actions row. */
+.wd-postpone {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--slate-200);
+    flex-wrap: wrap;
+}
+
+.wd-postpone input[type="date"] {
+    flex: 1 1 130px;
+    min-width: 0;
+    padding: 5px 8px;
+    border: 1px solid var(--slate-300);
+    border-radius: var(--radius-xs, 6px);
+    font-family: inherit;
+    font-size: 11.5px;
+    color: var(--slate-800);
+}
+
+.wd-postpone input[type="date"]:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* Assigned-work badges on task cards. */
+.wd-badge.is-assigned {
+    background: var(--warning-bg, #fff7ed);
+    color: var(--warning-hover, #c2410c);
+    border: 1px solid var(--warning-border, #fed7aa);
+}
+
+.wd-badge.is-owner {
+    background: var(--slate-100);
+    color: var(--slate-600);
+    border: 1px solid var(--slate-200);
+}
+
+/* The calendar-date chip: same shape as the others, tinted so it reads as the
+   "whatever day you clicked" filter rather than a fixed one. */
+.wd-chip.is-date {
+    border-color: var(--info-border, #bae6fd);
+    color: var(--info-hover, #0369a1);
+}
+
+.wd-chip.is-date.is-active {
+    background: var(--info-bg, #f0f9ff);
+    border-color: var(--info, #0284c7);
+    color: var(--info-hover, #0369a1);
 }

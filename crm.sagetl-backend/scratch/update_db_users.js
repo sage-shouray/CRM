@@ -15,8 +15,12 @@ async function run() {
     // 1. Get or create Super Admin
     let adminRes = await client.query('SELECT * FROM users WHERE email = $1', ['admin@sagetl.com']);
     let adminId;
+    // Never hardcode a credential in a committed file.
+    if (!process.env.SUPER_ADMIN_PASSWORD) {
+      throw new Error('Set SUPER_ADMIN_PASSWORD before running this script.');
+    }
     const salt = await bcrypt.genSalt(10);
-    const hashedAdminPassword = await bcrypt.hash('Admin@1234', salt);
+    const hashedAdminPassword = await bcrypt.hash(process.env.SUPER_ADMIN_PASSWORD, salt);
 
     if (adminRes.rowCount === 0) {
       const insertAdmin = await client.query(`

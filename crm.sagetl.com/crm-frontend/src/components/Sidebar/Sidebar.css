@@ -1,0 +1,559 @@
+/* Persistent right rail: square-grid calendar on top, the agenda / task list
+   filling the middle, quick notes pinned at the bottom.
+
+   Each section scrolls internally where it can, and the rail itself scrolls as
+   a backstop on viewports too short to fit all three — otherwise the notes
+   list at the bottom is simply clipped away. */
+.app-sidebar {
+  /* Fluid, not fixed. A 410px rail is comfortable on a 21" monitor and eats a
+     third of a 14" laptop, which is what made narrow screens feel broken.
+     Scales continuously with the viewport between a usable floor and the
+     comfortable ceiling. */
+  --sidebar-width: clamp(268px, 24vw, 410px);
+
+  width: var(--sidebar-width);
+  flex: 0 0 var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  box-sizing: border-box;
+  background: #ffffff;
+  border-left: 1px solid var(--slate-200);
+  box-shadow: -1px 0 12px rgba(15, 23, 42, 0.04);
+  height: 100%;
+  min-height: 0;
+  /* Was overflow:hidden on the assumption that the three sections always fit,
+     each section scrolling internally. They do not fit on a short laptop
+     screen: the calendar takes its natural height, none of the three can
+     shrink, and the overflow — the saved-notes list at the bottom — was
+     clipped away with no way to reach it. Scrolling the rail is the backstop
+     for viewports too short to show everything at once. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+/* ---- calendar ---- Natural height; square cells sit at the top of the rail. */
+.sidebar-calendar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Narrow screens: the rail stops being a column and sits above the content. */
+@media (max-width: 1100px) {
+  .app-sidebar {
+    --sidebar-width: 100%;
+    flex: 0 0 auto;
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--slate-200);
+    overflow: visible;
+  }
+
+  .sidebar-calendar {
+    flex: 0 0 auto;
+  }
+}
+
+/* ---- calendar fitted to the rail ----
+   HomeCalendar was built for a wide dashboard column. In the rail the cells are
+   small, so the layout is restructured rather than merely shrunk: the day
+   number is centred, "today" becomes a filled circle on the number instead of a
+   text pill that never fitted, and the event counts become plain dots. */
+.sidebar-calendar .home-calendar-card {
+  /* Natural height — the cell ratio below decides how tall the month is. */
+  height: auto;
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  overflow: visible;
+}
+
+.sidebar-calendar .calendar-header-bar {
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sidebar-calendar .calendar-title-group h2,
+.sidebar-calendar .calendar-title-group > * {
+  font-size: 14.5px;
+  white-space: nowrap;
+}
+
+.sidebar-calendar .calendar-header-icon {
+  display: none;
+}
+
+.sidebar-calendar .btn-today-shortcut {
+  padding: 4px 9px;
+  font-size: 11px;
+}
+
+.sidebar-calendar .btn-cal-nav {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+}
+
+.sidebar-calendar .calendar-weekdays-row {
+  padding-bottom: 4px;
+}
+
+.sidebar-calendar .weekday-cell {
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  padding: 3px 0;
+}
+
+/* ---- day grid ----
+   Cells are nearly square and evenly spaced. The number sits centred with room
+   for the dots beneath, rather than being crammed into a flat strip. */
+.sidebar-calendar .calendar-days-grid {
+  height: auto;
+  grid-auto-rows: auto;
+  gap: 4px;
+}
+
+.sidebar-calendar .calendar-day-cell {
+  height: auto;
+  aspect-ratio: 1 / 0.94;
+  padding: 3px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  overflow: visible;
+  border-radius: 8px;
+}
+
+.sidebar-calendar .day-number-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  width: 100%;
+}
+
+.sidebar-calendar .day-num {
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* "TODAY" never fitted a 45px cell — it rendered as a clipped "TOD". The day
+   number itself becomes the marker instead. */
+.sidebar-calendar .today-badge {
+  display: none;
+}
+
+.sidebar-calendar .today-day {
+  background: transparent;
+  border-color: transparent;
+}
+
+.sidebar-calendar .today-day .day-num {
+  background: var(--primary);
+  color: #ffffff;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-calendar .selected-day {
+  box-shadow: 0 0 0 2px var(--primary) !important;
+}
+
+/* Event counts read as dots at this size; the number inside was unreadable and
+   the exact count is already in the tooltip. */
+.sidebar-calendar .day-event-indicators-horizontal {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 0;
+  padding-top: 0;
+  min-height: 6px;
+}
+
+.sidebar-calendar .event-badge {
+  width: 6px;
+  height: 6px;
+  min-width: 6px;
+  border-radius: 50%;
+  font-size: 0;
+  color: transparent;
+  padding: 0;
+  border: none;
+  overflow: hidden;
+}
+
+.sidebar-calendar .calendar-day-cell:hover {
+  transform: none;
+  background: var(--slate-50);
+}
+
+/* Legend: all three on one line, never wrapping to a second. */
+.sidebar-calendar .calendar-legend-footer {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  height: auto;
+  overflow: hidden;
+}
+
+.sidebar-calendar .legend-item {
+  font-size: 9.5px;
+  gap: 4px;
+  white-space: nowrap;
+  /* Allowed to shrink so three items always share the row rather than the
+     last one dropping underneath. */
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.sidebar-calendar .legend-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+}
+
+/* ---- reports section ----
+   Sits directly under the calendar and takes the remaining vertical space,
+   scrolling internally when the list is long. */
+.sidebar-reports {
+  flex: 1;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-subtle);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.sidebar-reports-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sidebar-reports-head h3 {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--slate-700);
+}
+
+.sidebar-reports-count {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: var(--primary-light);
+  color: var(--primary-hover);
+  border: 1px solid var(--primary-border);
+}
+
+.sidebar-reports-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-reports-note {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--slate-500);
+}
+
+.sidebar-reports-note.is-error {
+  color: var(--danger);
+}
+
+.sidebar-report-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: all var(--transition-fast);
+}
+
+.sidebar-report-item:hover {
+  background: var(--primary-light);
+  border-color: var(--primary-border);
+}
+
+.sidebar-report-icon {
+  font-size: 14px;
+  color: #dc2626;
+  flex-shrink: 0;
+}
+
+.sidebar-report-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+/* The file name is the point of this list — never let it wrap the row open. */
+.sidebar-report-name {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--slate-800);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-report-meta {
+  font-size: 9.5px;
+  color: var(--slate-500);
+}
+
+.sidebar-report-dl {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--slate-400);
+  flex-shrink: 0;
+}
+
+.sidebar-report-item:hover .sidebar-report-dl {
+  color: var(--primary);
+}
+
+/* ---- add task ----
+   Only the widget's header and its Add Task button live here now, so the block
+   is sized to its content rather than stretching. */
+.sidebar-addtask {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-addtask .home-todo-card {
+  height: auto;
+  padding: 10px;
+  overflow: visible;
+}
+
+.sidebar-addtask .todo-widget-header {
+  gap: 10px;
+}
+
+.sidebar-addtask .widget-title-group h3 {
+  font-size: 13px;
+  margin: 0;
+}
+
+.sidebar-addtask .widget-title-group p {
+  font-size: 10.5px;
+  margin: 2px 0 0;
+}
+
+.sidebar-addtask .widget-header-icon {
+  display: none;
+}
+
+/* ---- notes ----
+   Pinned to the bottom of the rail at a fixed compact height: a two-line
+   composer plus a scrolling list of saved notes. */
+.sidebar-notes {
+  /* Allowed to shrink (0 1 auto, not 0 0 auto) so on a short screen the notes
+     panel gives ground gracefully instead of overflowing the rail and taking
+     its own saved-notes list out of view. */
+  flex: 0 1 auto;
+  min-height: 140px;
+  /* Roomier than the calendar it sits under — this is the panel people
+     actually type into. Tied to viewport height so a short laptop screen does
+     not give the notes 300px and leave the agenda above it with nothing. */
+  height: clamp(170px, 28vh, 300px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: var(--shadow-subtle);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.sidebar-notes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sidebar-notes-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--slate-700);
+}
+
+.sidebar-notes-count {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: var(--radius-full, 999px);
+  background: var(--primary-light);
+  color: var(--primary-hover);
+  border: 1px solid var(--primary-border);
+}
+
+.sidebar-notes-compose {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sidebar-notes-compose textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  padding: 7px 9px;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--radius-xs, 6px);
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--slate-800);
+  box-sizing: border-box;
+}
+
+.sidebar-notes-compose textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.sidebar-notes-add {
+  flex: 0 0 auto;
+  width: 30px;
+  background: var(--slate-900);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-xs, 6px);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sidebar-notes-add:hover:not(:disabled) {
+  background: var(--primary);
+}
+
+.sidebar-notes-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sidebar-notes-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sidebar-notes-empty {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--slate-400);
+}
+
+.sidebar-note {
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-xs, 6px);
+  padding: 6px 8px;
+}
+
+.sidebar-note p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--slate-800);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sidebar-note-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.sidebar-note-foot span {
+  font-size: 9.5px;
+  color: var(--slate-400);
+}
+
+.sidebar-note-foot button {
+  background: transparent;
+  border: none;
+  color: var(--slate-400);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.sidebar-note-foot button:hover {
+  color: var(--danger, #dc2626);
+}
+
+/* Stacked layout: the rail is no longer a fixed-height column, so the sections
+   take their natural height and the page scrolls as one. */
+@media (max-width: 1100px) {
+  .app-sidebar {
+    height: auto;
+    overflow: visible;
+  }
+
+  .sidebar-notes {
+    height: auto;
+    max-height: 320px;
+  }
+}

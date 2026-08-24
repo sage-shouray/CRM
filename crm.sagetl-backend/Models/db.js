@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const { ROLE_LABELS, ROLES } = require('../Middleware/roles');
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/crm';
@@ -38,6 +39,10 @@ function buildWhereClause(query, startParamIndex = 1) {
     }
 
     let col = key;
+    // A parallel jsonb-typed (not text-cast) path for dotted keys, needed by
+    // $arrayContains: containment only works against actual jsonb, and
+    // ->>'key' text-extraction would compare against the string "[1,2]".
+    let jsonbCol = null;
     if (key === '_id' || key === 'id') {
       col = 'id';
     } else if (key.includes('.')) {
@@ -48,10 +53,12 @@ function buildWhereClause(query, startParamIndex = 1) {
       else if (topCol === 'contactInfo') mappedCol = 'contact_info';
       else if (topCol === 'itLandscape') mappedCol = 'it_landscape';
       else mappedCol = topCol;
-      
+
       let jsonPath = mappedCol;
+      let jsonbPath = mappedCol;
       for (let i = 1; i < parts.length; i++) {
         const isLast = i === parts.length - 1;
+        jsonbPath += `->'${parts[i]}'`;
         if (isLast) {
           jsonPath += `->>'${parts[i]}'`;
         } else {
@@ -59,6 +66,7 @@ function buildWhereClause(query, startParamIndex = 1) {
         }
       }
       col = jsonPath;
+      jsonbCol = jsonbPath;
     } else if (col === 'supervisor') {
       // The only column whose name is not just the snake_case of the field.
       col = 'supervisor_id';
@@ -96,6 +104,24 @@ function buildWhereClause(query, startParamIndex = 1) {
       } else if (value.$regex) {
         conditions.push(`${col} ~* $${paramIndex++}`);
         values.push(value.$regex);
+      } else if (value.$arrayContains !== undefined) {
+        // Matches whether the stored value is a bare scalar (legacy leads
+        // assigned to one person) or a JSON array (multi-BDM assignment):
+        // jsonb @> treats a scalar right-hand side as "does this array
+        // contain it, or equal it" either way.
+        const ids = Array.isArray(value.$arrayContains)
+          ? value.$arrayContains
+          : [value.$arrayContains];
+        if (ids.length === 0) {
+          conditions.push('1 = 0');
+        } else {
+          const parts = ids.map((id) => {
+            const idx = paramIndex++;
+            values.push(Number(id));
+            return `COALESCE(${jsonbCol || col}, 'null'::jsonb) @> to_jsonb($${idx}::int)`;
+          });
+          conditions.push('(' + parts.join(' OR ') + ')');
+        }
       }
     } else {
       const finalVal = (value && typeof value === 'object' && value._id) ? value._id : value;
@@ -208,6 +234,49 @@ class UserModelInstance {
       return this;
     }
   }
+}
+
+// Which JSONB column each nested lead field lives in.
+const LEAD_JSON_COLUMNS = {
+  companyInfo: 'company_info',
+  contactInfo: 'contact_info',
+  itLandscape: 'it_landscape',
+  descriptions: 'descriptions',
+};
+
+// Turn an update object into SQL SET fragments plus their bound values.
+//
+// Handles both whole-column updates ({ companyInfo: {...} }) and the dotted
+// paths callers naturally write for a single nested field
+// ({ "companyInfo.leadAssignedTo": 7 }). The dotted form used to be dropped
+// silently: mapLeadToDb did not recognise the key, the UPDATE was skipped, and
+// the caller was handed back an unchanged record as if the write had worked.
+function buildLeadUpdate(update) {
+  const sets = [];
+  const values = [];
+
+  for (const [column, value] of Object.entries(mapLeadToDb(update || {}))) {
+    values.push(value);
+    sets.push(`"${column}" = $${values.length}`);
+  }
+
+  for (const [key, value] of Object.entries(update || {})) {
+    if (!key.includes('.')) continue;
+    const [root, ...rest] = key.split('.');
+    const column = LEAD_JSON_COLUMNS[root];
+    // Path segments are interpolated into SQL, so accept only plain
+    // identifiers — these come from server code, never from a request body.
+    if (!column || rest.length === 0) continue;
+    if (!rest.every((part) => /^[A-Za-z0-9_]+$/.test(part))) continue;
+
+    values.push(JSON.stringify(value === undefined ? null : value));
+    sets.push(
+      `"${column}" = jsonb_set(COALESCE("${column}", '{}'::jsonb), ` +
+      `'{${rest.join(',')}}', $${values.length}::jsonb, true)`
+    );
+  }
+
+  return { sets, values };
 }
 
 // Instance representing a single Lead record (for .save() and .populate())
@@ -441,7 +510,13 @@ const Lead = {
               });
             }
           } else if (pop.path === 'companyInfo.leadAssignedTo') {
-            const userIds = [...new Set(items.map(l => l.companyInfo.leadAssignedTo).filter(id => id && !isNaN(id)))];
+            // A lead may be assigned to one BDM (legacy: a bare id) or several
+            // (an array of ids). Either shape is normalised to an id list here
+            // and written back in the same shape it was read in.
+            const asIdList = (v) => (Array.isArray(v) ? v : v !== null && v !== undefined ? [v] : []);
+            const userIds = [...new Set(
+              items.flatMap(l => asIdList(l.companyInfo.leadAssignedTo)).filter(id => id && !isNaN(id))
+            )];
             if (userIds.length > 0) {
               const uRes = await pool.query(`SELECT * FROM users WHERE id IN (${inPlaceholders(userIds)})`, userIds);
               const uMap = {};
@@ -449,9 +524,11 @@ const Lead = {
                 uMap[u.id] = u;
               });
               items.forEach(l => {
-                const assignedId = l.companyInfo.leadAssignedTo;
-                if (assignedId && uMap[assignedId]) {
-                  l.companyInfo.leadAssignedTo = uMap[assignedId];
+                const raw = l.companyInfo.leadAssignedTo;
+                if (Array.isArray(raw)) {
+                  l.companyInfo.leadAssignedTo = raw.map(id => uMap[id]).filter(Boolean);
+                } else if (raw && uMap[raw]) {
+                  l.companyInfo.leadAssignedTo = uMap[raw];
                 }
               });
             }
@@ -547,15 +624,37 @@ const Lead = {
   },
   
   findByIdAndUpdate: async function(id, update, options) {
-    const dbFields = mapLeadToDb(update);
-    const keys = Object.keys(dbFields);
-    const values = Object.values(dbFields);
-    if (keys.length === 0) return this.findById(id);
-    const setClause = keys.map((k, idx) => `"${k}" = $${idx + 1}`).join(', ');
-    const sql = `UPDATE leads SET ${setClause} WHERE id = $${keys.length + 1} RETURNING *`;
-    const res = await pool.query(sql, [...values, id]);
+    const { sets, values } = buildLeadUpdate(update);
+    // No recognised field: return the record untouched rather than issuing an
+    // UPDATE with an empty SET.
+    if (sets.length === 0) return this.findById(id);
+    values.push(id);
+    const sql =
+      `UPDATE leads SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP ` +
+      `WHERE id = $${values.length} RETURNING *`;
+    const res = await pool.query(sql, values);
     if (res.rowCount === 0) return null;
     return new LeadModelInstance(mapLead(res.rows[0]));
+  },
+
+  // Bulk equivalent of findByIdAndUpdate. Callers reached for this expecting
+  // Mongoose's updateMany; without it the call threw a TypeError that the
+  // route's catch reported as a generic 500.
+  updateMany: async function(filter, update) {
+    const ids = (filter?._id?.$in || filter?.id?.$in || [])
+      .map(Number)
+      .filter((n) => Number.isFinite(n));
+    if (ids.length === 0) return { matchedCount: 0, modifiedCount: 0 };
+
+    const { sets, values } = buildLeadUpdate(update);
+    if (sets.length === 0) return { matchedCount: 0, modifiedCount: 0 };
+
+    values.push(ids);
+    const sql =
+      `UPDATE leads SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP ` +
+      `WHERE id = ANY($${values.length}::int[])`;
+    const res = await pool.query(sql, values);
+    return { matchedCount: res.rowCount, modifiedCount: res.rowCount };
   }
 };
 
@@ -576,7 +675,8 @@ class TaskModelInstance {
       priority: this.priority,
       status: this.status,
       category: this.category,
-      user_id: this.userId ? Number(this.userId) : null
+      user_id: this.userId ? Number(this.userId) : null,
+      assigned_by: this.assignedBy ? Number(this.assignedBy) : null
     };
     const keys = Object.keys(dbFields);
     const values = Object.values(dbFields);
@@ -612,6 +712,7 @@ function mapTask(row) {
     status: row.status,
     category: row.category,
     userId: row.user_id,
+    assignedBy: row.assigned_by ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -689,6 +790,22 @@ const OptionsModel = {
   }
 };
 
+// Resolve a password for first-run seeding.
+//
+// Seed credentials must never be committed. The value comes from the named
+// environment variable; when that is unset a random one is generated and
+// printed once so a fresh install still works without shipping a known
+// password in the repository.
+function resolveSeedPassword(envVar) {
+  const fromEnv = process.env[envVar];
+  if (fromEnv && fromEnv.trim()) {
+    return { password: fromEnv.trim(), generated: false };
+  }
+  // 18 bytes -> 24 base64url chars.
+  const password = crypto.randomBytes(18).toString('base64url');
+  return { password, generated: true };
+}
+
 // Every user id at or below `userId` in the reporting tree: the user, the
 // people whose supervisor is them, the people below those, and so on.
 //
@@ -764,6 +881,52 @@ async function initializeDB() {
       );
     `);
 
+    // Personal scratchpad notes, one row per note, private to their author.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notes (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        body TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);`);
+
+    // Presence samples: one row per heartbeat from an open tab. "active" means
+    // the browser saw real mouse/keyboard input recently, which is what
+    // separates someone working from a tab left open on an empty desk.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_activity (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        state VARCHAR(10) NOT NULL DEFAULT 'active',
+        page VARCHAR(160)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_activity_user_at ON user_activity(user_id, at DESC);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_activity_at ON user_activity(at DESC);`);
+
+    // The daily worklog every non-Admin fills in: what they actually did that
+    // day, in their own words.
+    //
+    // work_date is a DATE and carries a UNIQUE constraint per user, so the
+    // "one entry per person per day, today only" rule is enforced by the
+    // database and not merely by the route that happens to write it.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS daily_worklog (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        work_date DATE NOT NULL,
+        body TEXT NOT NULL,
+        hours NUMERIC(4,1),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT daily_worklog_one_per_day UNIQUE (user_id, work_date)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_worklog_date ON daily_worklog(work_date DESC);`);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS options (
         id SERIAL PRIMARY KEY,
@@ -813,6 +976,21 @@ async function initializeDB() {
       );
     `);
 
+    // Generated report files. The PDF itself is stored as bytes so a report
+    // survives a redeploy without needing a shared filesystem or bucket.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS reports (
+        id SERIAL PRIMARY KEY,
+        file_name VARCHAR(255) NOT NULL,
+        report_type VARCHAR(60),
+        mime_type VARCHAR(100) NOT NULL DEFAULT 'application/pdf',
+        size_bytes INT,
+        content BYTEA,
+        generated_by INT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Applied-migration ledger, so one-shot data changes stay one-shot.
     await pool.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -852,6 +1030,56 @@ async function initializeDB() {
       );
     }
 
+    // Four tiers -> three (admin / manager / executive).
+    //
+    // Super Admin is folded into Admin: the product has one top tier that sees
+    // everything. "bdm" and "businesslead" are renamed to the words the
+    // business actually uses. Runs once, guarded by the ledger.
+    const rolesV3 = await pool.query(
+      'SELECT 1 FROM schema_migrations WHERE key = $1',
+      ['roles_v3_three_tier']
+    );
+    if (rolesV3.rowCount === 0) {
+      // The CHECK constraint from the previous migration only allows the old
+      // names, so it has to come off before the values change.
+      await pool.query(
+        `ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_valid`
+      );
+      const admins = await pool.query(
+        `UPDATE users SET role = 'admin' WHERE role = 'superadmin'`
+      );
+      const managers = await pool.query(
+        `UPDATE users SET role = 'manager' WHERE role = 'bdm'`
+      );
+      const executives = await pool.query(
+        `UPDATE users SET role = 'executive' WHERE role = 'businesslead'`
+      );
+      await pool.query(
+        'INSERT INTO schema_migrations (key) VALUES ($1)',
+        ['roles_v3_three_tier']
+      );
+      console.log(
+        `Role migration v3 applied: ${admins.rowCount} superadmin -> admin, ` +
+        `${managers.rowCount} -> manager, ${executives.rowCount} -> executive.`
+      );
+    }
+
+    // Which Executives a Manager may see beyond its own direct reports. The
+    // reporting tree stays the default; this table is the Admin's override.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS manager_access (
+        id SERIAL PRIMARY KEY,
+        manager_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        executive_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        granted_by INT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (manager_id, executive_id)
+      );
+    `);
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_manager_access_manager ON manager_access(manager_id);`
+    );
+
     // Reject unknown roles at the database level. Kept in its own try/catch so
     // an unexpected legacy value cannot abort the rest of startup.
     try {
@@ -862,7 +1090,7 @@ async function initializeDB() {
             SELECT 1 FROM pg_constraint WHERE conname = 'users_role_valid'
           ) THEN
             ALTER TABLE users ADD CONSTRAINT users_role_valid
-              CHECK (role IN ('superadmin', 'admin', 'bdm', 'businesslead'));
+              CHECK (role IN ('admin', 'manager', 'executive'));
           END IF;
         END $$;
       `);
@@ -873,6 +1101,37 @@ async function initializeDB() {
       );
     }
 
+    // Lead numbers must be 5 digits. lead_number is a SERIAL, so uniqueness is
+    // already the sequence's job — all this does is push the sequence past
+    // 10000 and pin its floor there, so every number handed out from now on is
+    // 10000..99999. Existing rows keep the numbers they were given (tasks
+    // reference leads by number as free text, so renumbering would orphan them).
+    await pool.query(`
+      DO $$
+      DECLARE
+        seq TEXT := pg_get_serial_sequence('leads', 'lead_number');
+        max_used BIGINT;
+      BEGIN
+        IF seq IS NULL THEN
+          RETURN;
+        END IF;
+        SELECT COALESCE(MAX(lead_number), 0) INTO max_used FROM leads;
+        -- Move the current value into range before raising the floor, so the
+        -- sequence is never left sitting below its own MINVALUE.
+        IF max_used < 10000 THEN
+          PERFORM setval(seq, 10000, false);
+        ELSE
+          PERFORM setval(seq, max_used, true);
+        END IF;
+        -- START must move too: Postgres rejects a MINVALUE above the sequence's
+        -- START value, which is still 1 from the original SERIAL.
+        EXECUTE format(
+          'ALTER SEQUENCE %s MINVALUE 10000 MAXVALUE 99999 START 10000 NO CYCLE',
+          seq
+        );
+      END $$;
+    `);
+
     // Indexes on hot query paths (idempotent).
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_supervisor_id ON users(supervisor_id);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);`);
@@ -880,9 +1139,18 @@ async function initializeDB() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_leads_created_by ON leads(created_by);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_leads_assigned_to ON leads((company_info->>'leadAssignedTo'));`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);`);
+
+    // Who handed the task out, when it was assigned rather than self-created.
+    // Idempotent so it is safe on every boot.
+    await pool.query(`
+      ALTER TABLE tasks
+        ADD COLUMN IF NOT EXISTS assigned_by INT REFERENCES users(id) ON DELETE SET NULL;
+    `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_recipient_id ON messages(recipient_id);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_group_id ON messages(group_id);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reports_generated_by ON reports(generated_by);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);`);
 
     console.log("PostgreSQL schema initialized successfully.");
 
@@ -891,10 +1159,17 @@ async function initializeDB() {
       console.log("Seeding default users...");
       const usersData = JSON.parse(fs.readFileSync(path.join(__dirname, "../Users.json"), "utf-8"));
       const emailToId = {};
-      
+
+      // Users.json carries no passwords — it is committed, so anything in it is
+      // public. Every seeded account gets the SEED_DEFAULT_PASSWORD, or its own
+      // random password printed once below.
+      const seeded = [];
+
       for (const u of usersData) {
+        const { password, generated } = resolveSeedPassword('SEED_DEFAULT_PASSWORD');
+        seeded.push({ email: u.email, password, generated });
         const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(u.password, salt);
+        const hashedPassword = await bcrypt.hash(password, salt);
         const nameParts = u.name.split(' ');
         const firstName = nameParts[0];
         const lastName = nameParts.slice(1).join(' ') || 'User';
@@ -919,24 +1194,40 @@ async function initializeDB() {
           }
         }
       }
+      // Printed once, at first run only. Distribute these out of band and have
+      // each person change their password on first sign-in.
+      const generatedOnes = seeded.filter((s) => s.generated);
+      if (generatedOnes.length > 0) {
+        console.log("One-time generated passwords (shown once — store securely):");
+        generatedOnes.forEach((s) => console.log(`  ${s.email.padEnd(26)} ${s.password}`));
+        console.log("Set SEED_DEFAULT_PASSWORD to seed with a known password instead.");
+      }
       console.log("User seeding complete.");
     }
 
-    // Ensure Super Admin admin@sagetl.com exists with requested password Admin@1234
-    const adminCheck = await pool.query('SELECT * FROM users WHERE email = $1', ['admin@sagetl.com']);
-    const salt = await bcrypt.genSalt(10);
-    const hashedAdminPassword = await bcrypt.hash('Admin@1234', salt);
+    // Ensure the Super Admin account exists.
+    //
+    // This used to reset the password to a hardcoded value on EVERY startup,
+    // which meant the account could never actually be rotated — any change was
+    // reverted by the next restart. An existing user's password is now left
+    // strictly alone; only a missing account is created.
+    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@sagetl.com';
+    const adminCheck = await pool.query('SELECT id FROM users WHERE email = $1', [superAdminEmail]);
     if (adminCheck.rowCount === 0) {
+      const { password, generated } = resolveSeedPassword('SUPER_ADMIN_PASSWORD');
+      const salt = await bcrypt.genSalt(10);
+      const hashedAdminPassword = await bcrypt.hash(password, salt);
       await pool.query(`
         INSERT INTO users (first_name, last_name, designation, email, mobile, password, role, status)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `, ['Admin', 'Super Admin', 'Super Admin', 'admin@sagetl.com', '9999999999', hashedAdminPassword, ROLES.SUPER_ADMIN, 'active']);
-      console.log("Super Admin user 'admin@sagetl.com' created successfully.");
-    } else {
-      await pool.query(`
-        UPDATE users SET password = $1, role = $3, status = 'active' WHERE email = $2
-      `, [hashedAdminPassword, 'admin@sagetl.com', ROLES.SUPER_ADMIN]);
-      console.log("Super Admin user 'admin@sagetl.com' password & role updated successfully.");
+      `, ['Admin', 'Super Admin', 'Super Admin', superAdminEmail, '9999999999', hashedAdminPassword, ROLES.ADMIN, 'active']);
+      console.log(`Super Admin '${superAdminEmail}' created.`);
+      if (generated) {
+        console.log(
+          `  One-time generated password: ${password}\n` +
+          `  Sign in and change it now. Set SUPER_ADMIN_PASSWORD to choose your own.`
+        );
+      }
     }
 
     const defaultOptions = {
@@ -973,6 +1264,15 @@ async function initializeDB() {
         "LOST"
       ],
       priorityOptions: ["High", "Medium", "Low"],
+      // Explicit funnel stages, so a lead's position is stored rather than
+      // guessed from whatever its next action happens to be.
+      pipelineStageOptions: [
+        "Prospecting",
+        "Qualification",
+        "Proposal",
+        "Negotiation",
+        "Closed-Won",
+      ],
       leadSourceOptions: ["Reference", "Self Generated", "Existing Database"],
       stateOptions: ["Maharashtra", "Delhi", "Karnataka"],
       countryOptions: ["India", "USA", "UK"],

@@ -2,67 +2,32 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { io } from "socket.io-client";
-import { ROLES, normalizeRole, roleShortLabel, canManageUsers } from "../../roles";
+import { ROLES, normalizeRole, roleShortLabel } from "../../roles";
 import { handleSuccess } from "../../utils";
-import { ToastContainer, toast } from "react-toastify";
+import { toast } from "react-toastify";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faHouse,
+  faMagnifyingGlass,
+  faPlus,
+  faBell,
   faRightFromBracket,
-  faFileExcel,
-  faComments,
-  faChevronDown
+  faBuilding
 } from "@fortawesome/free-solid-svg-icons";
-import Dropdown from "./Dropdown";
 import "./Header.css";
 import logo from "./logo.png";
 
 import { API_BASE_URL } from "../../config";
 
-const headerButtonsByRole = {
-  // Super Admin and Admin get the same menu; what differs is how much data the
-  // server returns behind it (Admin is scoped to its own branch).
-  [ROLES.SUPER_ADMIN]: [
-    {
-      name: "Leads",
-      items: ["Company Info", "Companies", "Multiple Assign", "Unassigned Leads"],
-    },
-    { name: "To-do", items: ["To-do List"] },
-    { name: "Team", items: ["Overview"] },
-    { name: "Users", items: ["User Management"] },
-    { name: "Account", items: ["My Profile", "Change Password"] },
-  ],
-  [ROLES.ADMIN]: [
-    {
-      name: "Leads",
-      items: ["Company Info", "Companies", "Multiple Assign", "Unassigned Leads"],
-    },
-    { name: "To-do", items: ["To-do List"] },
-    { name: "Team", items: ["Overview"] },
-    { name: "Users", items: ["User Management"] },
-    { name: "Account", items: ["My Profile", "Change Password"] },
-  ],
-  [ROLES.BDM]: [
-    { name: "Lead", items: ["Create Leads"] },
-    {
-      name: "Lead Details",
-      items: ["Company Info", "Companies", "Multiple Assign", "Unassigned Leads", "BI"],
-    },
-    { name: "Team", items: ["Overview"] },
-    { name: "To-do", items: ["To-do List"] },
-    { name: "Account", items: ["My Profile", "Change Password"] },
-  ],
-  [ROLES.BUSINESS_LEAD]: [
-    { name: "Lead", items: ["Create Leads", "Company Info", "Companies"] },
-    { name: "To-do", items: ["To-do List"] },
-    { name: "Account", items: ["My Profile", "Change Password"] },
-  ],
-};
+// Navigation moved to the left rail (components/Nav/SideNav.js); this bar now
+// carries identity, search and the primary action only.
 
 function Header() {
-  const [loggedInUser, setLoggedInUser] = useState("");
   const [userRole, setUserRole] = useState("");
-  const [openDropdown, setOpenDropdown] = useState(null);
+  const [loggedInUser, setLoggedInUser] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
   const [unreadTotal, setUnreadTotal] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
@@ -70,7 +35,6 @@ function Header() {
   const currentPathRef = useRef(currentPath);
   currentPathRef.current = currentPath;
 
-  const isHomeActive = currentPath === "/home" || currentPath === "/";
   const isChatActive = currentPath === "/chat";
 
   const currentUserId = Number(sessionStorage.getItem("userId") || "0");
@@ -106,6 +70,17 @@ function Header() {
 
     socket.on("messages_read", () => refetchUnread());
 
+    // Work handed to this user by someone above them. The server emits to the
+    // user's own room, so this only fires for the assignee.
+    socket.on("task_assigned", (task) => {
+      toast.info(
+        `${task.assignedByName || "Someone"} assigned you: ${task.title}`,
+        { position: "top-right", autoClose: 8000 }
+      );
+      // Nudge any open list to pick the new task up without a reload.
+      window.dispatchEvent(new Event("tasks:changed"));
+    });
+
     // Chat page dispatches this after it marks a conversation read.
     const onUnreadChanged = () => refetchUnread();
     window.addEventListener("chat:unread-changed", onUnreadChanged);
@@ -121,32 +96,52 @@ function Header() {
     if (currentUserId) refetchUnread();
   }, [currentPath, currentUserId, refetchUnread]);
 
-  const isDropdownActive = (button) => {
-    const pathsByItem = {
-      "Create Leads": "/create-lead",
-      "Company Info": "/leads",
-      Companies: "/companies",
-      BI: "/bi",
-      "Unassigned Leads": "/unassigned-leads",
-      Overview: "/team-overview",
-      "To-do List": "/todo",
-      "User Management": "/user-management",
-      "Change Password": "/profile",
-      Profile: "/profile",
-      "My Profile": "/profile",
-      "Multiple Assign": "/multiple-assign",
-    };
-    return button.items.some(item => {
-      const path = pathsByItem[item];
-      if (!path) return false;
-      return currentPath.startsWith(path);
-    });
-  };
-
   useEffect(() => {
+    setUserRole(normalizeRole(sessionStorage.getItem("userRole")) || ROLES.EXECUTIVE);
     setLoggedInUser(sessionStorage.getItem("loggedInUser") || "User");
-    setUserRole(normalizeRole(sessionStorage.getItem("userRole")) || ROLES.BUSINESS_LEAD);
   }, []);
+
+  // Company type-ahead, reusing the same endpoint the Create Lead form uses for
+  // duplicate detection — so what the search predicts and what the form treats
+  // as an existing company can never disagree.
+  useEffect(() => {
+    const term = searchTerm.trim();
+    if (term.length < 2) {
+      setSuggestions([]);
+      setSuggestOpen(false);
+      return;
+    }
+
+    // Debounced, and `cancelled` stops a slow response overwriting a newer one.
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/leads/company-search`, {
+          params: { q: term },
+        });
+        if (cancelled) return;
+        const list = Array.isArray(res.data) ? res.data : [];
+        setSuggestions(list);
+        setHighlight(-1);
+        setSuggestOpen(list.length > 0);
+      } catch (err) {
+        if (!cancelled) {
+          setSuggestions([]);
+          setSuggestOpen(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchTerm]);
+
+  // Any navigation closes the dropdown.
+  useEffect(() => {
+    setSuggestOpen(false);
+  }, [currentPath]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("token");
@@ -161,163 +156,149 @@ function Header() {
     }, 800);
   };
 
-  const handleDocumentClick = (event) => {
-    if (!event.target.closest(".dropdown")) {
-      setOpenDropdown(null);
-    }
-  };
-
-  useEffect(() => {
-    document.addEventListener("click", handleDocumentClick);
-    return () => {
-      document.removeEventListener("click", handleDocumentClick);
-    };
-  }, []);
-
-  const toggleDropdown = (index) => {
-    setOpenDropdown(openDropdown === index ? null : index);
-  };
-
-  const downloadFile = async (type) => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/download/${type}`,
-        {
-          responseType: "blob",
-          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
-        }
-      );
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `${type}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (error) {
-      console.error("Error downloading file:", error);
-    }
-  };
-
-  const headerButtons = headerButtonsByRole[userRole] || [];
+  const userInitial = (loggedInUser.charAt(0) || "U").toUpperCase();
   const roleHeaderClass =
     {
-      [ROLES.SUPER_ADMIN]: "superadmin-header",
+      [ROLES.ADMIN]: "superadmin-header",
       [ROLES.ADMIN]: "admin-header",
-      [ROLES.BDM]: "bdm-header",
-      [ROLES.BUSINESS_LEAD]: "businesslead-header",
+      [ROLES.MANAGER]: "bdm-header",
+      [ROLES.EXECUTIVE]: "businesslead-header",
     }[userRole] || "";
-  const userInitial = (loggedInUser.charAt(0) || "U").toUpperCase();
+
+  // Global search hands off to the Companies page, which already knows how to
+  // filter by company name / lead number.
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    // If a suggestion is highlighted, that wins over the raw text.
+    if (highlight >= 0 && suggestions[highlight]) {
+      return goToCompany(suggestions[highlight]);
+    }
+    const term = searchTerm.trim();
+    setSuggestOpen(false);
+    navigate(term ? `/companies?q=${encodeURIComponent(term)}` : "/companies");
+  };
+
+  const goToCompany = (match) => {
+    setSuggestOpen(false);
+    setSearchTerm(match.companyName);
+    navigate(`/companies?q=${encodeURIComponent(match.companyName)}`);
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (!suggestOpen || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlight((i) => (i + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+    } else if (e.key === "Escape") {
+      setSuggestOpen(false);
+    }
+  };
 
   return (
-    <div className="main-container">
+    <header className={`main-container topbar ${roleHeaderClass}`}>
       <div className="brand-logo-area" onClick={() => navigate("/home")} title="Return to Dashboard">
         <img src={logo} alt="Sage CRM Logo" className="top-image" />
-        <span className="brand-badge">CRM PORTAL</span>
       </div>
 
-      <div
-        className={`main-header ${roleHeaderClass}`}
-      >
-        <div className="header-buttons">
-          <button
-            onClick={() => navigate("/home")}
-            className={`btn-home-shortcut ${isHomeActive ? "active" : ""}`}
-            title="Dashboard Home"
-          >
-            <FontAwesomeIcon icon={faHouse} />
-            <span>Home</span>
-          </button>
+      <span className="topbar-title">CRM Portal</span>
 
-          <button
-            onClick={() => navigate("/chat")}
-            className={`btn-home-shortcut chat-nav-btn ${isChatActive ? "active" : ""} ${unreadTotal > 0 ? "has-unread" : ""}`}
-            title="In-App Chat & Messages"
-          >
-            <FontAwesomeIcon icon={faComments} />
-            <span>Chat</span>
-            {unreadTotal > 0 && (
-              <span className="nav-unread-badge">{unreadTotal > 99 ? "99+" : unreadTotal}</span>
-            )}
-          </button>
+      <form className="topbar-search" onSubmit={handleSearchSubmit} role="search">
+        <FontAwesomeIcon icon={faMagnifyingGlass} className="topbar-search-icon" />
+        <input
+          type="search"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
+          onFocus={() => suggestions.length > 0 && setSuggestOpen(true)}
+          /* Delayed so a click on a suggestion lands before the list closes. */
+          onBlur={() => setTimeout(() => setSuggestOpen(false), 120)}
+          placeholder="Search leads, companies…"
+          aria-label="Search companies"
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={suggestOpen}
+          aria-controls="topbar-suggestions"
+        />
 
-          {headerButtons.map((button, index) => (
-            <Dropdown
-              key={index}
-              name={button.name}
-              items={button.items}
-              isOpen={openDropdown === index}
-              toggleDropdown={() => toggleDropdown(index)}
-              isActive={isDropdownActive(button)}
-            />
-          ))}
+        {suggestOpen && suggestions.length > 0 && (
+          <ul className="topbar-suggestions" id="topbar-suggestions" role="listbox">
+            {suggestions.map((match, i) => (
+              <li key={match.leadNumber}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={i === highlight}
+                  className={`topbar-suggestion ${
+                    i === highlight ? "is-active" : ""
+                  }`}
+                  onMouseEnter={() => setHighlight(i)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => goToCompany(match)}
+                >
+                  <FontAwesomeIcon icon={faBuilding} />
+                  <span className="topbar-suggestion-name">
+                    {match.companyName}
+                  </span>
+                  <span className="topbar-suggestion-meta">
+                    #{match.leadNumber}
+                    {match.owner ? ` · ${match.owner}` : ""}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </form>
 
-          {canManageUsers(userRole) && (
-            <div className={`dropdown ${openDropdown === "downloads" ? "open" : ""}`}>
-              <button
-                onClick={() => toggleDropdown("downloads")}
-                className="dropdown-trigger-btn"
-                title="Export Data"
-              >
-                <FontAwesomeIcon icon={faFileExcel} className="nav-cat-icon" />
-                <span>Downloads</span>
-                <FontAwesomeIcon icon={faChevronDown} className="dropdown-arrow" />
-              </button>
-              {openDropdown === "downloads" && (
-                <ul className="dropdown-menu">
-                  <li
-                    onClick={() => {
-                      downloadFile("leads");
-                      setOpenDropdown(null);
-                    }}
-                    className="dropdown-item"
-                    title="Export all leads to Excel"
-                  >
-                    <FontAwesomeIcon icon={faFileExcel} className="dropdown-item-icon" />
-                    <span>Leads XLSX</span>
-                  </li>
-                  <li
-                    onClick={() => {
-                      downloadFile("users");
-                      setOpenDropdown(null);
-                    }}
-                    className="dropdown-item"
-                    title="Export all users to Excel"
-                  >
-                    <FontAwesomeIcon icon={faFileExcel} className="dropdown-item-icon" />
-                    <span>Users XLSX</span>
-                  </li>
-                </ul>
-              )}
-            </div>
+      <div className="topbar-actions">
+        <button
+          type="button"
+          className="topbar-new-lead"
+          onClick={() => navigate("/create-lead")}
+        >
+          <FontAwesomeIcon icon={faPlus} />
+          <span>New Lead</span>
+        </button>
+
+        <button
+          type="button"
+          className={`topbar-icon-btn ${isChatActive ? "is-active" : ""}`}
+          onClick={() => navigate("/chat")}
+          title={
+            unreadTotal > 0
+              ? `${unreadTotal} unread message${unreadTotal === 1 ? "" : "s"}`
+              : "Messages"
+          }
+        >
+          <FontAwesomeIcon icon={faBell} />
+          {unreadTotal > 0 && (
+            <span className="topbar-dot">{unreadTotal > 9 ? "9+" : unreadTotal}</span>
           )}
-        </div>
+        </button>
 
-        <div className="user-info">
-          <div
-            className="user-profile-trigger"
-            onClick={() => navigate("/profile")}
-            title="View Profile & Settings"
-          >
-            <div className="avatar-circle">
-              <span>{userInitial}</span>
-            </div>
-            <div className="user-text-details">
-              <span className="user-name">{loggedInUser}</span>
-              <span className="user-role-label">{roleShortLabel(userRole).toUpperCase()}</span>
-            </div>
-          </div>
+        <button
+          type="button"
+          className="topbar-user"
+          onClick={() => navigate("/profile")}
+          title="My profile and password"
+        >
+          <span className="topbar-avatar">{userInitial}</span>
+          <span className="topbar-user-text">
+            <strong>{loggedInUser}</strong>
+            <small>{roleShortLabel(userRole)}</small>
+          </span>
+        </button>
 
-          <button onClick={handleLogout} className="logout-button" title="Sign out of CRM">
-            <FontAwesomeIcon icon={faRightFromBracket} />
-            <span>Logout</span>
-          </button>
-        </div>
+        <button type="button" className="topbar-logout" onClick={handleLogout}>
+          <FontAwesomeIcon icon={faRightFromBracket} />
+          <span>Logout</span>
+        </button>
       </div>
 
-      <ToastContainer />
-    </div>
+    </header>
   );
 }
 

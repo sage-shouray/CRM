@@ -2,7 +2,6 @@
   {
     "name": "Super Admin",
     "email": "admin@sagetl.com",
-    "password": "Admin@1234",
     "role": "superadmin",
     "designation": "Super Admin",
     "userId": "ADM000"
@@ -10,7 +9,6 @@
   {
     "name": "Prashant AD",
     "email": "prashant@sagetl.com",
-    "password": "Sage123",
     "role": "admin",
     "designation": "AD",
     "userId": "SUP001"
@@ -18,7 +16,6 @@
   {
     "name": "Anushka IS",
     "email": "anushka@sagetl.com",
-    "password": "Sage123",
     "role": "businesslead",
     "designation": "IS",
     "userId": "SUB001",
@@ -27,7 +24,6 @@
   {
     "name": "Kanishka IS",
     "email": "kanishka@sagetl.com",
-    "password": "Sage123",
     "role": "businesslead",
     "designation": "IS",
     "userId": "SUB002",
@@ -36,7 +32,6 @@
   {
     "name": "Utkarsh BDM",
     "email": "utkarsh@sagetl.com",
-    "password": "Sage123",
     "role": "businesslead",
     "designation": "BDM",
     "userId": "SUB003",
@@ -45,7 +40,6 @@
   {
     "name": "Vishal BDM",
     "email": "vishal@sagetl.com",
-    "password": "Sage123",
     "role": "businesslead",
     "designation": "BDM",
     "userId": "SUB004",
@@ -54,7 +48,6 @@
   {
     "name": "Akash BDM",
     "email": "akash@sagetl.com",
-    "password": "Sage123",
     "role": "businesslead",
     "designation": "BDM",
     "userId": "SUB005",

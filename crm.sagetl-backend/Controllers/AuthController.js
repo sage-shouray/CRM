@@ -3,61 +3,66 @@ const jwt = require('jsonwebtoken');
 const UserModel = require("../Models/User");
 const nodemailer = require('nodemailer');
 const transporter = require("../Models/emailService");
+const { ROLES, normalizeRole } = require("../Middleware/roles");
 
-const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: "Email and password are required.", success: false });
+// Same allow-list index.js uses for CORS: an explicit CORS_ORIGINS list, plus
+// (unless disabled) any private-network address, since the LAN address DHCP
+// hands out moves on its own.
+const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:3000")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+const PRIVATE_ORIGIN = /^https?:\/\/(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
+const allowLanOrigins = (process.env.ALLOW_LAN_ORIGINS || "true").trim() !== "false";
+
+const isTrustedOrigin = (origin) =>
+  !!origin &&
+  (allowedOrigins.includes(origin) || (allowLanOrigins && PRIVATE_ORIGIN.test(origin)));
+
+// Where the reset link should point. The app's own address, not the API's.
+//
+// This was hardcoded to localhost:3000 while the frontend runs on 3005, so
+// every link that did arrive led nowhere. Preference order: an explicit
+// APP_URL, then the address the browser actually made the request from — but
+// only once it's checked against the same allow-list CORS uses. Trusting
+// Origin/Referer outright let a caller point the emailed reset link (which
+// carries a live, self-contained token) at an attacker-controlled domain;
+// falling back to the local default is safe, since it grants no attacker
+// anything a legitimate request wouldn't already have.
+const appBaseUrl = (req) => {
+  const configured = (process.env.APP_URL || "").trim().replace(/\/+$/, "");
+  if (configured) return configured;
+
+  const origin = req.headers.origin;
+  if (origin && isTrustedOrigin(origin)) return origin.replace(/\/+$/, "");
+
+  const referer = req.headers.referer;
+  if (referer) {
+    try {
+      const refererOrigin = new URL(referer).origin;
+      if (isTrustedOrigin(refererOrigin)) return refererOrigin;
+    } catch (err) {
+      /* fall through to the default */
     }
-
-    const user = await UserModel.findOne({ email });
-    const errorMsg = "Auth failed email or password is wrong";
-
-    if (!user || user.status === "inactive") {
-      return res.status(403).json({
-        success: false,
-        message: user ? "Your account is inactive." : "Invalid email or password",
-      });
-    }
-
-    const isPassEqual = await bcrypt.compare(password, user.password);
-    if (!isPassEqual) {
-      return res.status(403).json({
-        message: errorMsg,
-        success: false,
-      });
-    }
-
-    const jwtToken = jwt.sign(
-      { email: user.email, _id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "24h" }
-    );
-
-    res.status(200).json({
-      message: "login sucessful",
-      success: true,
-      jwtToken,
-      email: user.email,
-      firstName: user.firstName,
-      userId: user._id,
-      role: user.role,
-    });
-  } catch (err) {
-    console.error("Login error:", err);
-    res.status(500).json({
-      message: "Internal server error",
-      success: false,
-    });
   }
+
+  return "http://localhost:3005";
 };
 
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
+
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.error("Password reset requested but no mail account configured.");
+      return res.status(500).json({
+        success: false,
+        message:
+          "Email is not configured on the server, so the reset link cannot " +
+          "be sent. Ask an administrator to set your password directly.",
+      });
+    }
+
     const user = await UserModel.findOne({ email });
 
     if (!user) {
@@ -66,6 +71,8 @@ const forgotPassword = async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
+    // Kept at 24h to match the copy in the email below; the two used to
+    // disagree, telling people a link had an hour when it had a day.
     const token = jwt.sign(
       {
         _id: user._id,
@@ -75,31 +82,68 @@ const forgotPassword = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
-    const resetLink = `http://localhost:3000/reset-password/${token}`;
+    const resetLink = `${appBaseUrl(req)}/reset-password/${token}`;
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: transporter.fromAddress,
       to: email,
-      subject: "Password Reset Link",
+      subject: "Reset your Sage CRM password",
+      // A text part alongside the HTML: mail that is HTML-only is far more
+      // likely to be filed as spam, which is one way a "delivered" message
+      // still never reaches the inbox.
+      text:
+        `You requested a password reset for Sage CRM.\n\n` +
+        `Open this link to choose a new password:\n${resetLink}\n\n` +
+        `The link expires in 24 hours. If you did not request this, ignore ` +
+        `this email — your password stays unchanged.`,
       html: `
-        <h1>Password Reset</h1>
-        <p>You requested a password reset. Click the link below to reset your password:</p>
-        <a href="${resetLink}">Reset Password</a>
-        <p>This link will expire in 1 hour.</p>
-        <p>If you didn't request this, please ignore this email.</p>
+        <h2>Password reset</h2>
+        <p>You requested a password reset for Sage CRM. Click below to choose a new password:</p>
+        <p><a href="${resetLink}" style="display:inline-block;padding:10px 18px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px">Reset password</a></p>
+        <p>Or paste this link into your browser:<br><span style="color:#475569">${resetLink}</span></p>
+        <p>This link expires in 24 hours.</p>
+        <p style="color:#64748b;font-size:13px">If you didn't request this, ignore this email — your password stays unchanged.</p>
       `,
     };
 
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error("Error sending email:", error);
-        return res
-          .status(500)
-          .json({ success: false, message: "Error sending email" });
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      // Gmail accepting a message is not the same as the recipient receiving
+      // it. Recording accepted/rejected here is what makes a silent
+      // non-delivery diagnosable afterwards.
+      console.log(
+        `Password reset mail for ${email}: accepted=${JSON.stringify(
+          info.accepted
+        )} rejected=${JSON.stringify(info.rejected)} response=${info.response}`
+      );
+
+      if (info.rejected && info.rejected.length > 0) {
+        return res.status(502).json({
+          success: false,
+          message: `The mail server rejected ${email}. Check the address exists.`,
+        });
       }
 
-      res.json({ success: true, message: "Password reset link sent to email" });
-    });
+      return res.json({
+        success: true,
+        message: "Password reset link sent to email",
+      });
+    } catch (mailError) {
+      // The real SMTP failure, not a generic "Error sending email" that gives
+      // nothing to act on.
+      console.error("Could not send password reset email:", {
+        code: mailError.code,
+        responseCode: mailError.responseCode,
+        message: mailError.message,
+      });
+      return res.status(502).json({
+        success: false,
+        message:
+          mailError.responseCode === 535
+            ? "The server's email login was refused. The EMAIL_PASS app password needs renewing."
+            : `Could not send the email (${mailError.code || "unknown error"}).`,
+      });
+    }
   } catch (error) {
     console.error("Server error:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -194,6 +238,17 @@ const changePassword = async (req, res) => {
 const getUserProfile = async (req, res) => {
   try {
     const { userId } = req.params;
+
+    // A signed-in session is not, by itself, permission to read anyone's
+    // profile — only your own. Every caller of this route today only ever
+    // asks for their own id; an Admin gets the wider view every other admin
+    // screen already grants it.
+    const callerId = Number(req.user?._id ?? req.user?.id);
+    const isAdmin = normalizeRole(req.user?.role) === ROLES.ADMIN;
+    if (!isAdmin && callerId !== Number(userId)) {
+      return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+
     const user = await UserModel.findById(userId);
     if (!user) {
       return res
@@ -234,4 +289,4 @@ const getUserProfile = async (req, res) => {
   }
 };
 
-module.exports = { login, forgotPassword, resetPassword, changePassword, getUserProfile };
+module.exports = { forgotPassword, resetPassword, changePassword, getUserProfile };

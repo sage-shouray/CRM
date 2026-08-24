@@ -3,7 +3,18 @@ import axios from "axios";
 import "./UnassignedLeads.css"; // Reusing the existing CSS file for consistency
 import LeadDetails from "../Leads/LeadDetails";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
+import { API_BASE_URL } from "../../config";
+
+// A lead may be assigned to one populated user object (legacy) or several.
+const assignedNames = (lead) => {
+  const raw = lead.companyInfo?.leadAssignedTo;
+  const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  return list
+    .filter((u) => u && typeof u === "object")
+    .map((u) => `${u.firstName || ""} ${u.lastName || ""}`.trim())
+    .filter(Boolean)
+    .join(", ");
+};
 
 const MultipleAssign = () => {
   const [leads, setLeads] = useState([]);
@@ -321,9 +332,7 @@ const MultipleAssign = () => {
                 </button>
               </td>
               <td>{lead.companyInfo?.companyName || ""}</td>
-              <td>{`${lead.companyInfo.leadAssignedTo?.firstName || ""} ${
-                lead.companyInfo.leadAssignedTo?.lastName || ""
-              }`}</td>
+              <td>{assignedNames(lead)}</td>
               <td>{lead.companyInfo?.priority}</td>
               <td>
                 {lead.createdBy?.firstName || ""}{" "}

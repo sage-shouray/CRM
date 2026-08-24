@@ -36,9 +36,9 @@
 
 .widget-header-icon {
     font-size: 15px;
-    color: #f97316;
-    background: #fff7ed;
-    border: 1px solid #ffedd5;
+    color: var(--primary);
+    background: var(--primary-light);
+    border: 1px solid var(--primary-border);
     padding: 10px;
     border-radius: 8px;
     flex-shrink: 0;
@@ -70,49 +70,57 @@
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
     transition: all var(--transition-fast);
 }
 
 .btn-add-task-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
 }
 
 /* Modal Window for Creating New Task */
 .add-task-modal-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(15, 23, 42, 0.65);
-    backdrop-filter: blur(6px);
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 24px 20px;
     box-sizing: border-box;
+    animation: modalFade 0.16s ease-out;
+    overflow-y: auto;
 }
 
+@keyframes modalFade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* The dialog is a fixed-height box on tall screens and shrinks to fit short
+   ones: the body scrolls internally so the footer buttons are always reachable
+   without scrolling the page behind. */
 .add-task-modal-dialog {
     background: #ffffff;
-    border-radius: var(--radius-md);
+    border-radius: 16px;
     width: 100%;
-    max-width: 530px;
-    box-shadow: var(--shadow-lg);
-    border: 1px solid rgba(226, 232, 240, 0.9);
+    max-width: 580px;
+    max-height: calc(100vh - 48px);
+    box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.35),
+                0 0 0 1px rgba(15, 23, 42, 0.06);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    animation: modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes modalPop {
     from {
         opacity: 0;
-        transform: scale(0.96) translateY(12px);
+        transform: scale(0.97) translateY(10px);
     }
     to {
         opacity: 1;
@@ -120,69 +128,109 @@
     }
 }
 
+/* Header: light rather than the old dark slab, so the dialog reads as part of
+   the app instead of a separate window. */
 .modal-header-bar {
-    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-    padding: 20px 24px;
-    color: #ffffff;
+    background: #ffffff;
+    padding: 20px 24px 16px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid var(--slate-100);
+    flex: 0 0 auto;
 }
 
 .modal-title-box {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 13px;
     text-align: left;
 }
 
 .modal-title-icon {
-    font-size: 18px;
-    color: #fb923c;
-    background: rgba(249, 115, 22, 0.2);
-    padding: 10px;
-    border-radius: var(--radius-xs);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex: none;
+    font-size: 16px;
+    color: #ffffff;
+    background: var(--primary-gradient, linear-gradient(135deg, #4f46e5, #6366f1));
+    border-radius: 11px;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
 
 .modal-title-box h3 {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 800;
-    margin: 0 0 2px 0;
-    color: #ffffff;
+    margin: 0;
+    color: var(--slate-900);
+    letter-spacing: -0.2px;
 }
 
 .modal-title-box p {
-    font-size: 12px;
-    color: #94a3b8;
-    margin: 0;
+    font-size: 12.5px;
+    color: var(--slate-500);
+    margin: 2px 0 0;
 }
 
 .btn-modal-close {
-    background: rgba(255, 255, 255, 0.1);
+    background: transparent;
     border: none;
-    color: #cbd5e1;
+    color: var(--slate-400);
     width: 32px;
     height: 32px;
-    border-radius: var(--radius-xs);
+    border-radius: 8px;
     cursor: pointer;
     font-size: 15px;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex: none;
     transition: all var(--transition-fast);
 }
 
 .btn-modal-close:hover {
-    background: rgba(239, 68, 68, 0.25);
-    color: #ef4444;
+    background: var(--slate-100);
+    color: var(--slate-700);
 }
 
 .add-task-modal-form {
-    padding: 24px;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    min-height: 0;
     text-align: left;
+}
+
+.modal-scroll-body {
+    padding: 20px 24px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+/* Groups the fields into "what", "who", "when" without heavy panels. */
+.modal-section-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 2px 0 -2px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--slate-400);
+}
+
+.modal-section-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--slate-100);
 }
 
 .modal-form-group {
@@ -192,6 +240,9 @@
 }
 
 .modal-form-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: 12.5px;
     font-weight: 700;
     color: var(--slate-700);
@@ -201,94 +252,157 @@
     color: var(--danger);
 }
 
-.modal-input-text {
+.modal-optional {
+    font-size: 11px;
+    font-weight: 500;
+    font-style: italic;
+    color: var(--slate-400);
+}
+
+/* Explains why a control is empty or disabled, so an unavailable option reads
+   as a fact about this account rather than a broken field. */
+.modal-field-note {
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--slate-500, #64748b);
+}
+
+.modal-input-text,
+.modal-input-textarea,
+.modal-input-select {
     width: 100%;
-    padding: 11px 14px;
-    border: 1px solid var(--slate-300);
-    border-radius: var(--radius-xs);
+    padding: 11px 13px;
+    border: 1.5px solid var(--slate-200);
+    border-radius: 10px;
     font-size: 13.5px;
     font-family: inherit;
+    color: var(--slate-900);
+    background: #ffffff;
     box-sizing: border-box;
     transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.modal-input-text:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3.5px var(--primary-glow);
-}
-
-.modal-form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 14px;
-}
-
-.label-icon {
-    color: var(--primary);
-    margin-right: 4px;
-    font-size: 11.5px;
-}
-
 .modal-input-textarea {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--slate-300);
-    border-radius: var(--radius-xs);
-    font-size: 13px;
-    font-family: inherit;
-    box-sizing: border-box;
     resize: vertical;
-    transition: border-color var(--transition-fast);
+    min-height: 74px;
+    line-height: 1.5;
 }
 
-.modal-input-textarea:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3.5px var(--primary-glow);
+.modal-input-text::placeholder,
+.modal-input-textarea::placeholder {
+    color: #a3aec0;
 }
 
-.modal-input-select {
-    padding: 10px 12px;
-    border: 1px solid var(--slate-300);
-    border-radius: var(--radius-xs);
-    font-size: 13px;
-    font-family: inherit;
-    background: #ffffff;
-    width: 100%;
-    box-sizing: border-box;
-}
-
+.modal-input-text:focus,
+.modal-input-textarea:focus,
 .modal-input-select:focus {
     outline: none;
     border-color: var(--primary);
     box-shadow: 0 0 0 3.5px var(--primary-glow);
 }
 
+.modal-input-text:hover:not(:focus),
+.modal-input-textarea:hover:not(:focus),
+.modal-input-select:hover:not(:focus) {
+    border-color: var(--slate-300);
+}
+
+.modal-input-select:disabled {
+    background: var(--slate-50);
+    color: var(--slate-400);
+    cursor: not-allowed;
+}
+
+.modal-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+}
+
+.label-icon {
+    color: var(--primary);
+    font-size: 11.5px;
+}
+
+/* Priority: three buttons instead of a dropdown. One click, and the current
+   value is visible without opening anything. */
+.priority-segmented {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.priority-option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 10px;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--slate-600);
+    background: #ffffff;
+    border: 1.5px solid var(--slate-200);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.priority-option:hover {
+    border-color: var(--slate-300);
+    background: var(--slate-50);
+}
+
+.priority-option.is-selected.prio-high {
+    color: #b91c1c;
+    background: #fef2f2;
+    border-color: #fca5a5;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.priority-option.is-selected.prio-medium {
+    color: #b45309;
+    background: #fffbeb;
+    border-color: #fcd34d;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
+}
+
+.priority-option.is-selected.prio-low {
+    color: #047857;
+    background: #ecfdf5;
+    border-color: #6ee7b7;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+}
+
+/* Pinned to the bottom of the dialog, so Create is reachable however long the
+   form gets. */
 .modal-footer-actions {
     display: flex;
     justify-content: flex-end;
     align-items: center;
     gap: 10px;
-    padding-top: 14px;
+    padding: 14px 24px;
+    background: var(--slate-50);
     border-top: 1px solid var(--slate-100);
-    margin-top: 6px;
+    flex: 0 0 auto;
 }
 
 .btn-modal-cancel {
-    background: var(--slate-100);
-    border: 1px solid var(--slate-300);
+    background: #ffffff;
+    border: 1.5px solid var(--slate-200);
     color: var(--slate-700);
-    padding: 9px 18px;
-    border-radius: var(--radius-xs);
+    padding: 10px 18px;
+    border-radius: 9px;
     font-size: 13px;
+    font-family: inherit;
     font-weight: 700;
     cursor: pointer;
     transition: all var(--transition-fast);
 }
 
 .btn-modal-cancel:hover {
-    background: var(--slate-200);
+    background: var(--slate-100);
     color: var(--slate-900);
 }
 
@@ -296,21 +410,54 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: var(--primary-gradient);
+    background: var(--primary-gradient, linear-gradient(135deg, #4f46e5, #6366f1));
     border: none;
     color: #ffffff;
-    padding: 9px 20px;
-    border-radius: var(--radius-xs);
+    padding: 10px 22px;
+    border-radius: 9px;
     font-size: 13px;
+    font-family: inherit;
     font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3);
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
     transition: all var(--transition-fast);
 }
 
-.btn-modal-save:hover {
+.btn-modal-save:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 6px 18px rgba(249, 115, 22, 0.4);
+    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.4);
+}
+
+.btn-modal-save:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+@media (max-width: 560px) {
+    .add-task-modal-overlay {
+        padding: 12px;
+    }
+
+    .add-task-modal-dialog {
+        max-height: calc(100vh - 24px);
+    }
+
+    .modal-header-bar,
+    .modal-scroll-body,
+    .modal-footer-actions {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .modal-footer-actions {
+        flex-direction: column-reverse;
+    }
+
+    .modal-footer-actions button {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 /* Filter Segmented Controls Bar */
@@ -479,9 +626,9 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    background: #fff7ed;
-    border: 1px solid #ffedd5;
-    color: #ea580c;
+    background: var(--primary-light);
+    border: 1px solid var(--primary-border);
+    color: var(--primary-hover);
     padding: 1.5px 6px;
     border-radius: 6px;
     font-size: 10px;
@@ -490,7 +637,7 @@
 
 .lead-tag-icon {
     font-size: 9px;
-    color: #ea580c;
+    color: var(--primary-hover);
 }
 
 .task-description-inline {
@@ -963,7 +1110,7 @@
 
 .btn-view-lead:hover {
     background: var(--primary);
-    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
 }
 
 .agenda-empty-state {

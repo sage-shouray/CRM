@@ -4,26 +4,23 @@
 // so comparisons stay ordinal instead of being spelled out as string checks
 // scattered across the routes.
 const ROLES = {
-  SUPER_ADMIN: "superadmin",
   ADMIN: "admin",
-  BDM: "bdm",
-  BUSINESS_LEAD: "businesslead",
+  MANAGER: "manager",
+  EXECUTIVE: "executive",
 };
 
 const ROLE_ORDER = [
-  ROLES.SUPER_ADMIN,
   ROLES.ADMIN,
-  ROLES.BDM,
-  ROLES.BUSINESS_LEAD,
+  ROLES.MANAGER,
+  ROLES.EXECUTIVE,
 ];
 
 const ALL_ROLES = [...ROLE_ORDER];
 
 const ROLE_LABELS = {
-  [ROLES.SUPER_ADMIN]: "Super Admin",
   [ROLES.ADMIN]: "Admin",
-  [ROLES.BDM]: "Business Development Manager",
-  [ROLES.BUSINESS_LEAD]: "Business Lead",
+  [ROLES.MANAGER]: "Manager",
+  [ROLES.EXECUTIVE]: "Executive",
 };
 
 // Roles from the previous three-tier model that no longer exist.
@@ -33,8 +30,11 @@ const ROLE_LABELS = {
 // promote every Admin to Super Admin. The one-time move of the old top tier to
 // superadmin happens once in the database migration, never here.
 const RETIRED_ROLES = {
-  supervisor: ROLES.BDM,
-  subuser: ROLES.BUSINESS_LEAD,
+  superadmin: ROLES.ADMIN,
+  supervisor: ROLES.MANAGER,
+  bdm: ROLES.MANAGER,
+  subuser: ROLES.EXECUTIVE,
+  businesslead: ROLES.EXECUTIVE,
 };
 
 // Accepts a stored or token role and returns the current equivalent. Tokens
@@ -55,12 +55,19 @@ const outranks = (role, otherRole) => rankOf(role) < rankOf(otherRole);
 
 // Super Admin is the only tier with unrestricted visibility; everyone else is
 // limited to their own branch of the reporting tree.
-const isSuperAdmin = (role) => normalizeRole(role) === ROLES.SUPER_ADMIN;
+// The top tier sees everything; kept under the old name so the many call
+// sites that ask "is this the unrestricted role?" keep reading naturally.
+const isSuperAdmin = (role) => normalizeRole(role) === ROLES.ADMIN;
 
 // Tiers allowed to create and edit users. An Admin may manage the tiers below
 // it but never a Super Admin — see the guards in the user routes.
 const canManageUsers = (role) =>
-  [ROLES.SUPER_ADMIN, ROLES.ADMIN].includes(normalizeRole(role));
+  [ROLES.ADMIN].includes(normalizeRole(role));
+
+// Tiers that lead a team: they may assign work and leads downward. A Business
+// Lead has nobody below it and so may not.
+const canManageTeam = (role) =>
+  [ROLES.ADMIN, ROLES.MANAGER].includes(normalizeRole(role));
 
 module.exports = {
   ROLES,
@@ -73,4 +80,5 @@ module.exports = {
   outranks,
   isSuperAdmin,
   canManageUsers,
+  canManageTeam,
 };

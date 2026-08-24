@@ -1,0 +1,225 @@
+/* Employee daily activity: one row per person per day. */
+
+.dar {
+  margin-bottom: 26px;
+  padding: 18px 20px 20px;
+  background: #fff;
+  border: 1px solid var(--slate-200, #e2e8f0);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.dar-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.dar-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--slate-900, #0f172a);
+}
+
+.dar-head p {
+  margin: 4px 0 0;
+  max-width: 62ch;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--slate-500, #64748b);
+}
+
+.dar-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dar-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--slate-500, #64748b);
+}
+
+.dar-controls input {
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  border: 1.5px solid var(--slate-200, #e2e8f0);
+  border-radius: 8px;
+}
+
+.dar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-700, #334155);
+  background: #fff;
+  border: 1.5px solid var(--slate-200, #e2e8f0);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.dar-btn:hover:not(:disabled) {
+  background: var(--slate-50, #f8fafc);
+}
+
+.dar-btn-excel {
+  color: #fff;
+  background: #16794c;
+  border-color: #16794c;
+}
+
+.dar-btn-excel:hover:not(:disabled) {
+  background: #115e39;
+}
+
+.dar-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dar-quick {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.dar-quick button {
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--slate-600, #475569);
+  background: var(--slate-50, #f8fafc);
+  border: 1px solid var(--slate-200, #e2e8f0);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.dar-quick button:hover {
+  background: var(--primary-light, #eef2ff);
+  color: var(--primary-hover, #4338ca);
+}
+
+.dar-error {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.dar-empty {
+  margin: 0;
+  padding: 18px 0;
+  font-size: 13px;
+  color: var(--slate-500, #64748b);
+}
+
+/* The table can be wide; it scrolls inside its own box rather than pushing the
+   page sideways. */
+.dar-table-wrap {
+  overflow-x: auto;
+}
+
+.dar-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.dar-table th {
+  text-align: left;
+  padding: 9px 10px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--slate-500, #64748b);
+  border-bottom: 1.5px solid var(--slate-200, #e2e8f0);
+  white-space: nowrap;
+}
+
+.dar-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--slate-100, #f1f5f9);
+  color: var(--slate-700, #334155);
+  vertical-align: top;
+}
+
+.dar-table tbody tr:hover {
+  background: var(--slate-50, #f8fafc);
+}
+
+/* A day with no submitted report is the thing a manager is scanning for. */
+.dar-missing td {
+  background: #fffdf5;
+}
+
+.dar-role {
+  display: block;
+  font-size: 10.5px;
+  color: var(--slate-400, #94a3b8);
+}
+
+.dar-mins {
+  font-weight: 700;
+  color: var(--slate-900, #0f172a);
+}
+
+.dar-worklog {
+  max-width: 380px;
+}
+
+.dar-worklog-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--slate-700, #334155);
+  background: none;
+  border: none;
+  cursor: pointer;
+  white-space: pre-wrap;
+}
+
+.dar-worklog-toggle:hover {
+  color: var(--primary-hover, #4338ca);
+}
+
+.dar-hours {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--primary-light, #eef2ff);
+  color: var(--primary-hover, #4338ca);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.dar-none {
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 600;
+}

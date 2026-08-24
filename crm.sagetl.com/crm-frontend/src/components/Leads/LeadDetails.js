@@ -8,7 +8,7 @@ import {
 } from "../CreateLeads/formConfigs";
 import "./LeadDetails.css";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
+import { API_BASE_URL } from "../../config";
 
 // Must stay in step with the Lead Type list on the Create Lead form, otherwise
 // a lead saved with a type missing here opens with an empty dropdown and loses
@@ -41,6 +41,10 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate, startInEditMode = false })
         );
         setLead(response.data);
         setEditedLead(JSON.parse(JSON.stringify(response.data)));
+        // Opening straight into edit mode is only honoured for someone who is
+        // actually allowed to save; otherwise the form would accept changes
+        // and then be refused.
+        if (!response.data.canEdit) setEditMode(false);
       } catch (err) {
         setError(
           err.message || "An error occurred while fetching lead details"
@@ -63,7 +67,7 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate, startInEditMode = false })
         const allUsers = userNamesResponse.data || [];
         const bdmNames = allUsers
           // BDM is a role now, not a free-text designation.
-          .filter((user) => normalizeRole(user.role) === ROLES.BDM)
+          .filter((user) => normalizeRole(user.role) === ROLES.MANAGER)
           .map(user => user.firstName);
         setOptions((prevOptions) => ({
           ...prevOptions,
@@ -141,7 +145,9 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate, startInEditMode = false })
   const buildPayload = () => {
     const companyInfo = { ...(editedLead.companyInfo || {}) };
     if (companyInfo.leadAssignedTo !== undefined) {
-      companyInfo.leadAssignedTo = idOf(companyInfo.leadAssignedTo);
+      companyInfo.leadAssignedTo = Array.isArray(companyInfo.leadAssignedTo)
+        ? companyInfo.leadAssignedTo.map(idOf)
+        : idOf(companyInfo.leadAssignedTo);
     }
 
     return {
@@ -232,7 +238,61 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate, startInEditMode = false })
                 >
                   <label>{field.label}:</label>
 
-                  {field.type === "select" ? (
+                  {field.type === "multiselect" ? (
+                    (() => {
+                      // An option, and a value stored against this field, is
+                      // either a user object (leadAssignedTo — has an id) or a
+                      // bare name string (bdm — nothing but the string itself).
+                      const idOfOpt = (v) => String(v && typeof v === "object" ? v._id ?? v.id : v);
+                      const labelOfOpt = (v) =>
+                        v && typeof v === "object" ? `${v.firstName || ""} ${v.lastName || ""}`.trim() : String(v);
+
+                      const raw = subSection
+                        ? editedLead?.[section]?.[subSection]?.[field.name]
+                        : editedLead?.[section]?.[field.name];
+                      const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+                      const ids = list.map(idOfOpt);
+                      const allOptions = options[field.options] || [];
+
+                      if (!editMode) {
+                        const names = list
+                          .map((v) => {
+                            if (v && typeof v === "object") return labelOfOpt(v);
+                            const match = allOptions.find((o) => idOfOpt(o) === String(v));
+                            return match ? labelOfOpt(match) : String(v);
+                          })
+                          .filter(Boolean);
+                        return <span>{names.length ? names.join(", ") : "—"}</span>;
+                      }
+
+                      return (
+                        <div className="ld-multiselect-checkboxes">
+                          {allOptions.map((u) => {
+                            const id = idOfOpt(u);
+                            return (
+                              <label key={id} className="ld-multiselect-option">
+                                <input
+                                  type="checkbox"
+                                  checked={ids.includes(id)}
+                                  onChange={() => {
+                                    const next = ids.includes(id)
+                                      ? ids.filter((v) => v !== id)
+                                      : [...ids, id];
+                                    handleInputChange(
+                                      { target: { name: field.name, value: next } },
+                                      section,
+                                      subSection
+                                    );
+                                  }}
+                                />
+                                <span>{labelOfOpt(u)}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()
+                  ) : field.type === "select" ? (
                     <>
                       <select
                         name={field.name}
@@ -409,12 +469,23 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate, startInEditMode = false })
         <button onClick={onClose} disabled={saving}>
           Close
         </button>
-        <button
-          onClick={() => (editMode ? handleCancel() : setEditMode(true))}
-          disabled={saving}
-        >
-          {editMode ? "Cancel" : "Edit"}
-        </button>
+        {/* Everyone can open a lead; only its creator, their manager, or an
+            Admin may change it. The server decides and reports canEdit, so the
+            button is never offered where the save would be refused. */}
+        {lead.canEdit && (
+          <button
+            onClick={() => (editMode ? handleCancel() : setEditMode(true))}
+            disabled={saving}
+          >
+            {editMode ? "Cancel" : "Edit"}
+          </button>
+        )}
+        {!lead.canEdit && (
+          <span className="lead-readonly-note">
+            View only — this lead can be edited by its creator, their manager,
+            or an Admin.
+          </span>
+        )}
         {editMode && (
           <button onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : "Save Changes"}

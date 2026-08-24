@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import axios from "axios";
 import {
   companyFormConfig,
@@ -72,7 +73,17 @@ const isEmpty = (value) =>
 const formatValue = (value, userLookup) => {
   if (isEmpty(value)) return "—";
 
-  // leadAssignedTo can be a populated user object or a bare id.
+  // leadAssignedTo can be a single populated user / bare id (legacy leads),
+  // or an array of either when a lead has several BDMs.
+  const nameOf = (v) => {
+    if (v && typeof v === "object") return `${v.firstName || ""} ${v.lastName || ""}`.trim();
+    if (userLookup && userLookup[v]) return userLookup[v];
+    return String(v);
+  };
+
+  if (Array.isArray(value)) {
+    return value.map(nameOf).filter(Boolean).join(", ") || "—";
+  }
   if (typeof value === "object") {
     if (value.firstName) return `${value.firstName} ${value.lastName || ""}`.trim();
     return JSON.stringify(value);
@@ -87,6 +98,7 @@ const formatValue = (value, userLookup) => {
 };
 
 const Companies = () => {
+  const location = useLocation();
   const [leads, setLeads] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -125,6 +137,16 @@ const Companies = () => {
     };
     fetchData();
   }, [refreshTrigger]);
+
+  // The top bar's global search hands its term over as ?q=, so arriving from
+  // there lands on a pre-filtered list.
+  useEffect(() => {
+    const q = new URLSearchParams(location.search).get("q");
+    if (q !== null) {
+      setSearch(q);
+      setSelectedLeadNumber(null);
+    }
+  }, [location.search]);
 
   // id -> display name, so assigned-user ids render as people.
   const userLookup = useMemo(() => {

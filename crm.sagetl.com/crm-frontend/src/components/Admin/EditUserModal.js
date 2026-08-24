@@ -5,7 +5,7 @@ import "./UserTable.css"; // Assuming same CSS file for styling
 
 import { API_BASE_URL } from "../../config";
 
-const EditUserModal = ({ userId, onClose }) => {
+const EditUserModal = ({ userId, onClose, onSuccess }) => {
   const [userData, setUserData] = useState({
     firstName: "",
     lastName: "",
@@ -18,48 +18,40 @@ const EditUserModal = ({ userId, onClose }) => {
   });
 
   const [supervisors, setSupervisors] = useState([]); // Fetch supervisors
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // Fetch user details for editing
- useEffect(() => {
-   const fetchUserDetails = async () => {
-     try {
-       const response = await axios.get(
-         `${API_BASE_URL}/api/users/${userId}`
-       );
-       // Ensure the supervisor is displayed correctly
-       const { supervisor } = response.data;
-       setUserData({
-         ...response.data,
-         supervisor: supervisor ? supervisor._id : "", // Set supervisor ID if present
-       });
-     } catch (error) {
-       console.error("Error fetching user details:", error);
-     }
-   };
+  // Load the account being edited. There used to be two copies of this effect
+  // racing each other, one of which read supervisor as an object — the form is
+  // driven by whichever landed last, so the "Reports To" value was unreliable.
+  useEffect(() => {
+    if (!userId) return;
 
-   if (userId) {
-     fetchUserDetails();
-   }
- }, [userId]);
- useEffect(() => {
     const fetchUserDetails = async () => {
+      setLoading(true);
       try {
-        const response = await axios.get(
-          `${API_BASE_URL}/api/users/${userId}`
-        );
-        // Ensure the supervisor is displayed correctly
+        const response = await axios.get(`${API_BASE_URL}/api/users/${userId}`);
         setUserData({
           ...response.data,
-          supervisor: response.data.supervisor || "", // Set to empty string if null
+          // The API returns the supervisor's id; "" is the "No Manager" option.
+          supervisor: response.data.supervisor ?? "",
         });
-      } catch (error) {
-        console.error("Error fetching user details:", error);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching user details:", err);
+        // Without this the form silently stayed on its blank initial state and
+        // looked identical to the Create User form.
+        setError(
+          err.response?.data?.error ||
+            "Could not load this user's details. Close and try again."
+        );
+      } finally {
+        setLoading(false);
       }
     };
 
-    if (userId) {
-      fetchUserDetails();
-    }
+    fetchUserDetails();
   }, [userId]);
 
   // Fetch supervisors (users with roles 'supervisor' or 'admin')
@@ -89,35 +81,63 @@ const EditUserModal = ({ userId, onClose }) => {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    setError(null);
+    setSaving(true);
 
+    // Only the fields the server accepts. Sending the whole object back would
+    // include _id/id/supervisorName, which the update schema rejects outright.
     const updatedUserData = {
-      ...userData,
-      supervisor: userData.supervisor === "" ? null : userData.supervisor,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      designation: userData.designation,
+      email: userData.email,
+      mobile: userData.mobile,
+      role: userData.role,
+      supervisor: userData.supervisor === "" ? null : Number(userData.supervisor),
+      status: userData.status,
     };
 
     try {
-      // Update the user
-      await axios.put(
-        `${API_BASE_URL}/api/users/${userId}`,
-        updatedUserData
-      );
-      alert("User updated successfully!");
-
-      // If the user was deactivated, reassign their leads
-      if (updatedUserData.status === "inactive") {
-        await axios.put(`/api/leads/reassign/${userId}`);
+      await axios.put(`${API_BASE_URL}/api/users/${userId}`, updatedUserData);
+      if (onSuccess) {
+        onSuccess(
+          `${[updatedUserData.firstName, updatedUserData.lastName]
+            .filter(Boolean)
+            .join(" ")} was updated.`
+        );
       }
-
+      // Deactivating used to fire a PUT at /api/leads/reassign/:userId — a
+      // relative URL to a route that has never existed, so it 404'd and the
+      // catch below reported failure on an update that had already succeeded.
+      // Leads belonging to deactivated users already surface on the Unassigned
+      // Leads screen, which is where reassignment actually happens.
       onClose();
-    } catch (error) {
-      console.error("Error updating user:", error);
-      alert("Error updating user");
+    } catch (err) {
+      console.error("Error updating user:", err);
+      const data = err.response?.data;
+      setError(
+        data?.errors?.join(" ") ||
+          data?.error ||
+          data?.message ||
+          "Could not save these changes. Please try again."
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
 
+  if (loading) {
+    return <p className="user-form-loading">Loading user details…</p>;
+  }
+
   return (
     <form className="user-form" onSubmit={handleFormSubmit}>
+      {error && (
+        <div className="user-form-error" role="alert">
+          {error}
+        </div>
+      )}
       <div className="user-form-group">
         <label htmlFor="firstName">First Name</label>
         <input
@@ -214,8 +234,8 @@ const EditUserModal = ({ userId, onClose }) => {
       </div>
 
       <div className="user-form-group full-width">
-        <button className="edit-btn" type="submit">
-          Save Changes
+        <button className="edit-btn" type="submit" disabled={saving}>
+          {saving ? "Saving…" : "Save Changes"}
         </button>
         <button className="close-btn" type="button" onClick={onClose}>
           Cancel

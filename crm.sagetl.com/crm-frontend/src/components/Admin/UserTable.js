@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { ROLES, ROLE_ORDER, ROLE_LABELS, roleLabel, normalizeRole } from "../../roles";
+import { ROLES, ROLE_ORDER, ROLE_LABELS, roleLabel, normalizeRole, isSuperAdmin } from "../../roles";
 import axios from "axios";
 import AddUser from "./AddUser";
 import EditUserModal from "./EditUserModal";
 import "./UserTable.css";
+import { useLiveUpdates } from "../../liveUpdates";
 
 import { API_BASE_URL } from "../../config";
 
@@ -19,6 +20,10 @@ const UserModalOverlay = ({ children, onClose }) => {
 
 const UserTable = () => {
   const [users, setUsers] = useState([]);
+  const [deletingId, setDeletingId] = useState(null);
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -30,6 +35,12 @@ const UserTable = () => {
     status: "",
   });
   const [supervisors, setSupervisors] = useState([]); // To store supervisors for the dropdown
+
+  // Someone else adding, editing or deleting a user updates this table live.
+  useLiveUpdates(["users"], () => {
+    fetchUsers();
+    fetchSupervisors();
+  });
 
   useEffect(() => {
     fetchUsers();
@@ -64,6 +75,39 @@ const UserTable = () => {
       [e.target.name]: e.target.value,
     });
   };
+  // Deleting an account is not reversible, so it still asks first and names
+  // who — but in an in-app dialog rather than window.confirm(), which Chrome
+  // draws at the top of the window in its own unstyleable chrome.
+  const handleDeleteUser = (user) => {
+    setError(null);
+    setNotice(null);
+    setPendingDelete(user);
+  };
+
+  const confirmDeleteUser = async () => {
+    const user = pendingDelete;
+    if (!user) return;
+    setPendingDelete(null);
+
+    try {
+      setDeletingId(user._id);
+      await axios.delete(`${API_BASE_URL}/api/users/${user._id}`);
+      setUsers((prev) => prev.filter((u) => u._id !== user._id));
+      setError(null);
+      setNotice(
+        `${[user.firstName, user.lastName].filter(Boolean).join(" ")} was deleted.`
+      );
+    } catch (err) {
+      // The server refuses when the account still owns leads or has reports;
+      // show its explanation rather than a generic failure.
+      setError(
+        err.response?.data?.error || "Could not delete this user."
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const handleEditUser = (userId) => {
     setSelectedUserId(userId);
     setShowEditModal(true);
@@ -150,6 +194,7 @@ const UserTable = () => {
         <UserModalOverlay onClose={closeAddModal}>
           <h2 className="user-heading">Add New User</h2>
           <AddUser
+            onSuccess={setNotice}
             onClose={() => {
               closeAddModal();
               refreshUsers();
@@ -158,8 +203,45 @@ const UserTable = () => {
         </UserModalOverlay>
       )}
 
+      {pendingDelete && (
+        <UserModalOverlay onClose={() => setPendingDelete(null)}>
+          <h2 className="user-heading">Delete this user?</h2>
+          <p className="confirm-dialog-text">
+            <strong>
+              {[pendingDelete.firstName, pendingDelete.lastName]
+                .filter(Boolean)
+                .join(" ")}
+            </strong>{" "}
+            ({pendingDelete.email}) will be removed permanently.
+          </p>
+          <p className="confirm-dialog-text confirm-dialog-hint">
+            This cannot be undone. If they simply need to lose access, set the
+            account to inactive instead.
+          </p>
+          <div className="user-form-group full-width">
+            <button
+              type="button"
+              className="close-btn"
+              onClick={() => setPendingDelete(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="delete-btn"
+              onClick={confirmDeleteUser}
+            >
+              Delete User
+            </button>
+          </div>
+        </UserModalOverlay>
+      )}
+
       <div >
-        <table >
+        {error && <p className="user-table-error">{error}</p>}
+        {notice && <p className="user-table-notice">{notice}</p>}
+
+        <table className="user-table">
           <thead>
             <tr>
               <th>First Name</th>
@@ -177,7 +259,15 @@ const UserTable = () => {
                 <td>{user.lastName}</td>
                 <td>{user.email}</td>
                 <td>{roleLabel(user.role)}</td>
-                <td>{user.status}</td>
+                <td>
+                  <span
+                    className={`status-cell ${
+                      user.status === "active" ? "" : "is-inactive"
+                    }`}
+                  >
+                    {user.status}
+                  </span>
+                </td>
                 <td>
                   <button
                     className="edit-btn"
@@ -185,6 +275,27 @@ const UserTable = () => {
                   >
                     Edit
                   </button>
+                  {/* A Super Admin is undeletable — the server refuses it
+                      outright, so the button is not offered rather than
+                      failing on click. */}
+                  {isSuperAdmin(user.role) ? (
+                    <button
+                      className="delete-btn"
+                      disabled
+                      title="A Super Admin account cannot be deleted"
+                    >
+                      Delete
+                    </button>
+                  ) : (
+                    <button
+                      className="delete-btn"
+                      onClick={() => handleDeleteUser(user)}
+                      disabled={deletingId === user._id}
+                      title="Delete this account permanently"
+                    >
+                      {deletingId === user._id ? "…" : "Delete"}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -197,6 +308,7 @@ const UserTable = () => {
           <h2>Edit User</h2>
           <EditUserModal
             userId={selectedUserId}
+            onSuccess={setNotice}
             onClose={() => {
               closeEditModal();
               refreshUsers();

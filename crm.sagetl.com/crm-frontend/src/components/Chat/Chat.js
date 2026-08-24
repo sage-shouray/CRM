@@ -64,7 +64,7 @@ const Chat = () => {
   const typingTimeoutRef = useRef(null);
 
   const currentUserId = Number(sessionStorage.getItem("userId") || "0");
-  const userRole = normalizeRole(sessionStorage.getItem("userRole")) || ROLES.BUSINESS_LEAD;
+  const userRole = normalizeRole(sessionStorage.getItem("userRole")) || ROLES.EXECUTIVE;
 
   // Keep users ref updated for socket operations
   useEffect(() => {
@@ -706,6 +706,9 @@ const Chat = () => {
           )}
 
           {/* Group Chats */}
+          {(activeTab === "all" || activeTab === "groups") && filteredGroups.length > 0 && (
+            <div className="chat-list-section-label">Groups</div>
+          )}
           {(activeTab === "all" || activeTab === "groups") &&
             filteredGroups.map((g) => {
               const groupTypingStatus = typingUsers[`group_${g.id}`];
@@ -747,6 +750,9 @@ const Chat = () => {
             })}
 
           {/* Direct Contact Users */}
+          {(activeTab === "all" || activeTab === "direct") && filteredUsers.length > 0 && (
+            <div className="chat-list-section-label">Direct Messages</div>
+          )}
           {(activeTab === "all" || activeTab === "direct") &&
             filteredUsers.map((u) => {
               const isOnline = onlineUserIds.includes(u.id);
@@ -767,7 +773,7 @@ const Chat = () => {
                     })
                   }
                 >
-                  <div className="chat-avatar user-avatar">
+                  <div className={`chat-avatar user-avatar avatar-role-${u.role}`}>
                     {u.name.substring(0, 2).toUpperCase()}
                     {isOnline && <span className="online-indicator-dot"></span>}
                   </div>
@@ -800,7 +806,7 @@ const Chat = () => {
         {/* Active Chat Header */}
         <div className="chat-main-header">
           <div className="active-chat-info">
-            <div className={`chat-avatar ${selectedChat.type === 'global' ? 'global-avatar' : selectedChat.type === 'group' ? 'group-avatar' : 'user-avatar'}`}>
+            <div className={`chat-avatar ${selectedChat.type === 'global' ? 'global-avatar' : selectedChat.type === 'group' ? 'group-avatar' : `user-avatar avatar-role-${selectedChat.role}`}`}>
               {selectedChat.type === 'global' ? (
                 <FontAwesomeIcon icon={faBullhorn} />
               ) : selectedChat.type === 'group' ? (

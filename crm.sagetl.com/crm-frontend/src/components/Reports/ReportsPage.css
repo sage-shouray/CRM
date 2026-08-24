@@ -1,0 +1,407 @@
+.reports-page {
+  padding: 16px 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  text-align: left;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.reports-page-head h1 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--slate-900);
+  margin: 0;
+  letter-spacing: -0.4px;
+}
+
+.reports-page-head p {
+  font-size: 13px;
+  color: var(--slate-500);
+  margin: 4px 0 0 0;
+  max-width: 760px;
+}
+
+.rp-error {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-hover);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+/* ---- roll-up tiles ---- */
+.rp-totals {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.rp-total {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid var(--slate-200);
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-sizing: border-box;
+}
+
+.rp-total svg {
+  font-size: 16px;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.rp-total div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rp-total strong {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--slate-900);
+  line-height: 1.15;
+}
+
+.rp-total span {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--slate-500);
+}
+
+/* ---- panels ---- */
+.rp-panel {
+  background: #ffffff;
+  border: 1px solid var(--slate-200);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-sizing: border-box;
+}
+
+.rp-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.rp-panel-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--slate-700);
+}
+
+.rp-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--slate-600);
+}
+
+.rp-filter select {
+  padding: 6px 10px;
+  border: 1px solid var(--slate-300);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12.5px;
+  background: #ffffff;
+  color: var(--slate-800);
+  min-width: 200px;
+}
+
+.rp-filter select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* ---- tables ---- */
+.rp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.rp-table th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--slate-400);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--slate-200);
+  white-space: nowrap;
+}
+
+.rp-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--slate-100);
+  color: var(--slate-700);
+  vertical-align: top;
+}
+
+.rp-table tbody tr {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.rp-table tbody tr:hover {
+  background: var(--slate-50);
+}
+
+.rp-table tbody tr.is-selected {
+  background: var(--primary-light);
+}
+
+.rp-status {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--slate-100);
+  color: var(--slate-600);
+  white-space: nowrap;
+}
+
+.rp-status.is-done {
+  background: var(--success-bg, #ecfdf5);
+  color: var(--success-hover, #047857);
+}
+
+.rp-status.is-not_done {
+  background: var(--danger-bg);
+  color: var(--danger-hover);
+}
+
+.rp-status.is-postponed {
+  background: var(--warning-bg);
+  color: var(--warning-hover);
+}
+
+/* ---- tabs ---- */
+.rp-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.rp-tab {
+  background: transparent;
+  border: 1px solid var(--slate-200);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--slate-600);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.rp-tab:hover {
+  background: var(--slate-50);
+}
+
+.rp-tab.is-active {
+  background: var(--primary-light);
+  border-color: var(--primary-border);
+  color: var(--primary);
+}
+
+/* ---- action feed ---- */
+.rp-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+.rp-feed-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  padding: 9px 11px;
+}
+
+.rp-feed-icon {
+  font-size: 11px;
+  color: var(--primary);
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.rp-feed-lead {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--slate-900);
+}
+
+.rp-feed-num {
+  font-weight: 600;
+  color: var(--slate-400);
+}
+
+.rp-feed-text {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--slate-700);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rp-feed-date {
+  font-size: 10.5px;
+  color: var(--slate-400);
+}
+
+.rp-empty {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--slate-400);
+}
+
+@media (max-width: 1100px) {
+  .rp-totals {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Tables get their own horizontal scroll rather than breaking the page. */
+@media (max-width: 760px) {
+  .rp-totals {
+    grid-template-columns: 1fr;
+  }
+
+  .rp-panel {
+    overflow-x: auto;
+  }
+
+  .rp-table {
+    min-width: 620px;
+  }
+}
+
+/* ---- action buttons / notices ---- */
+.rp-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rp-schedule-note {
+  font-size: 11.5px;
+  color: var(--slate-400);
+  font-weight: 600;
+}
+
+.rp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #ffffff;
+  color: var(--slate-700);
+  border: 1px solid var(--slate-300);
+  border-radius: 8px;
+  padding: 7px 13px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.rp-btn:hover:not(:disabled) {
+  background: var(--slate-50);
+  border-color: var(--slate-400);
+}
+
+.rp-btn.is-primary {
+  background: var(--slate-900);
+  color: #ffffff;
+  border-color: var(--slate-900);
+}
+
+.rp-btn.is-primary:hover:not(:disabled) {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.rp-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rp-filter input[type="month"] {
+  padding: 6px 10px;
+  border: 1px solid var(--slate-300);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--slate-800);
+  background: #ffffff;
+}
+
+.rp-filter input[type="month"]:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.rp-notice {
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.rp-notice.is-ok {
+  background: var(--success-bg, #ecfdf5);
+  border: 1px solid var(--success-border, #a7f3d0);
+  color: var(--success-hover, #047857);
+}
+
+.rp-notice.is-error {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-hover);
+}
+
+/* Flags an expiry inferred from a year-only value. */
+.rp-approx {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--warning-hover, #c2410c);
+  white-space: nowrap;
+}
+
+/* These panels are informational, not row-clickable. */
+.rp-panel .rp-table tbody tr:not(.is-selected):hover {
+  background: var(--slate-50);
+}

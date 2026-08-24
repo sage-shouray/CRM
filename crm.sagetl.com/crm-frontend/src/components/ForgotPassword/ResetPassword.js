@@ -1,6 +1,6 @@
 import React, { useState } from "react";
+import { API_BASE_URL } from "../../config";
 import { useParams, useNavigate } from "react-router-dom";
-import { ToastContainer } from "react-toastify";
 import { handleError, handleSuccess } from "../../utils";
 import "./ResetPassword.css";
 import logo from "../Login/logo.png";
@@ -23,7 +23,6 @@ const handleSubmit = async (e) => {
   setIsLoading(true);
 
   try {
-    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
     const url = token
       ? `${API_BASE_URL}/auth/reset-password`
       : `${API_BASE_URL}/auth/change-password`; // Use new route for logged-in users
@@ -109,7 +108,6 @@ const handleSubmit = async (e) => {
         <p>Copyright &copy; Sage Technologies. All rights reserved.</p>
       </footer>
 
-      <ToastContainer />
     </div>
   );
 }

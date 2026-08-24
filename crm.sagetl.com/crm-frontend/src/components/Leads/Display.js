@@ -3,7 +3,8 @@ import axios from "axios";
 import LeadDetails from "./LeadDetails";
 import "./Display.css";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
+import { API_BASE_URL } from "../../config";
+import { useLiveUpdates } from "../../liveUpdates";
 
 const Display = () => {
   const [leads, setLeads] = useState([]);
@@ -12,6 +13,10 @@ const Display = () => {
   const [selectedLead, setSelectedLead] = useState(null);
   const [openInEditMode, setOpenInEditMode] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // A lead created or edited anywhere in the system refreshes this list, so
+  // the table is never stale until someone reloads the tab.
+  useLiveUpdates(["leads"], () => setRefreshTrigger((n) => n + 1));
   const currentUserId = sessionStorage.getItem("userId");
  const [options, setOptions] = useState({
    verticalOptions: [],
@@ -111,10 +116,13 @@ const Display = () => {
   }, [refreshTrigger, currentUserId, filters]);
 
   const getAssignedUser = (lead) => {
-    const assignedUser = lead.companyInfo?.leadAssignedTo; 
-    return assignedUser
-      ? `${assignedUser.firstName} ${assignedUser.lastName}`
-      : "Not Assigned";
+    const assignedUser = lead.companyInfo?.leadAssignedTo;
+    const list = Array.isArray(assignedUser) ? assignedUser : assignedUser ? [assignedUser] : [];
+    const names = list
+      .filter((u) => u && typeof u === "object")
+      .map((u) => `${u.firstName} ${u.lastName}`.trim())
+      .filter(Boolean);
+    return names.length ? names.join(", ") : "Not Assigned";
   };
 
   // Helper function to get the most recent description creation date

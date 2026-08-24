@@ -18,7 +18,7 @@
 
 .loading-spinner {
     font-size: 36px;
-    color: #D3640B;
+    color: var(--primary-hover);
     margin-bottom: 16px;
 }
 
@@ -67,14 +67,14 @@
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #f2842e 0%, #D3640B 100%);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
     color: #ffffff;
     font-size: 32px;
     font-weight: 800;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 6px 16px rgba(211, 100, 11, 0.35);
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
     flex-shrink: 0;
 }
 
@@ -95,7 +95,7 @@
 }
 
 .meta-icon {
-    color: #D3640B;
+    color: var(--primary-hover);
 }
 
 .badge-row {
@@ -171,8 +171,8 @@
 
 .section-icon {
     font-size: 22px;
-    color: #D3640B;
-    background: rgba(211, 100, 11, 0.1);
+    color: var(--primary-hover);
+    background: rgba(79, 70, 229, 0.1);
     width: 44px;
     height: 44px;
     border-radius: 12px;
@@ -262,8 +262,8 @@
     width: 40px;
     height: 40px;
     border-radius: 10px;
-    background: linear-gradient(135deg, rgba(211, 100, 11, 0.15), rgba(211, 100, 11, 0.05));
-    color: #D3640B;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(79, 70, 229, 0.05));
+    color: var(--primary-hover);
     font-size: 18px;
     display: flex;
     align-items: center;
@@ -287,12 +287,12 @@
 
 /* Password Change Provision (Bottom Section) */
 .password-section-card {
-    border-top: 3px solid #D3640B;
+    border-top: 3px solid var(--primary-hover);
 }
 
 .password-header-icon {
-    background: rgba(211, 100, 11, 0.1);
-    color: #D3640B;
+    background: rgba(79, 70, 229, 0.1);
+    color: var(--primary-hover);
 }
 
 .password-change-form {
@@ -347,9 +347,9 @@
 
 .input-with-icon input:focus {
     outline: none;
-    border-color: #D3640B;
+    border-color: var(--primary-hover);
     background-color: #ffffff;
-    box-shadow: 0 0 0 3px rgba(211, 100, 11, 0.14);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
 }
 
 .toggle-password-btn {
@@ -381,7 +381,7 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    background: #D3640B;
+    background: var(--primary-hover);
     color: #ffffff;
     border: none;
     padding: 13px 24px;
@@ -389,13 +389,13 @@
     font-size: 15px;
     font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(211, 100, 11, 0.25);
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
     transition: all 0.15s ease;
 }
 
 .btn-update-password:hover:not(:disabled) {
     background: #b55409;
-    box-shadow: 0 6px 18px rgba(211, 100, 11, 0.35);
+    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.35);
     transform: translateY(-1px);
 }
 

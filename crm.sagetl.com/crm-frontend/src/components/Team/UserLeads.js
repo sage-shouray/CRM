@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import LeadDetails from "../Leads/LeadDetails"; // Ensure you have this component
@@ -37,7 +38,6 @@ const UserLeads = () => {
 
     const fetchLeads = async () => {
       try {
-        const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
         const response = await axios.get(
           `${API_BASE_URL}/api/users/${userId}/leads`, // Update this URL to fetch leads for the specific user
           {
@@ -74,9 +74,12 @@ const UserLeads = () => {
   // Helper functions for rendering lead details
   const getAssignedUser = (lead) => {
     const assigned = lead.companyInfo?.leadAssignedTo;
-    return assigned
-      ? `${assigned.firstName} ${assigned.lastName}`
-      : "Not Assigned";
+    const list = Array.isArray(assigned) ? assigned : assigned ? [assigned] : [];
+    const names = list
+      .filter((u) => u && typeof u === "object")
+      .map((u) => `${u.firstName} ${u.lastName}`.trim())
+      .filter(Boolean);
+    return names.length ? names.join(", ") : "Not Assigned";
   };
 
   const getLatestDescriptionDate = (lead) => {
@@ -121,7 +124,7 @@ const UserLeads = () => {
               <tr key={lead._id || lead.leadNumber}>
                 <td>
                   <button
-                    className="display-button"
+                    className="user-leads-button"
                     onClick={() => handleLeadClick(lead.leadNumber)}
                   >
                     {lead.leadNumber || ""}

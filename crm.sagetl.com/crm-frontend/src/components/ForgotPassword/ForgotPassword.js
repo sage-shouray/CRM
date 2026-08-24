@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ToastContainer } from "react-toastify";
+import { API_BASE_URL } from "../../config";
 import { handleError, handleSuccess } from "../../utils";
 import "./ForgotPassword.css";
 import logo from "../Login/logo.png";
@@ -11,7 +11,6 @@ function ForgotPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
       const response = await fetch(
         `${API_BASE_URL}/auth/forgot-password`,
         {
@@ -69,7 +68,6 @@ function ForgotPassword() {
         <p>Copyright &copy; Sage Technologies. All rights reserved.</p>
       </footer>
 
-      <ToastContainer />
     </div>
   );
 }

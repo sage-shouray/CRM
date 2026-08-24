@@ -1,0 +1,121 @@
+.todays-work-card {
+    background: #ffffff;
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radius-md);
+    padding: 20px 22px;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+}
+
+.todays-work-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.todays-work-header .widget-title-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.todays-work-header .widget-header-icon {
+    color: var(--primary);
+    background: var(--primary-light);
+    border: 1px solid var(--primary-border);
+    padding: 10px;
+    border-radius: 10px;
+    font-size: 15px;
+}
+
+.todays-work-header h3 {
+    margin: 0 0 3px 0;
+    font-size: 15.5px;
+    font-weight: 700;
+    color: var(--slate-900);
+}
+
+.todays-work-header p {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--slate-500);
+}
+
+.todays-work-summary-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--slate-100);
+    border: 1px solid var(--slate-300);
+    color: var(--slate-700);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 7px 14px;
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+}
+
+.todays-work-loading,
+.todays-work-empty {
+    color: var(--slate-500);
+    font-size: 13px;
+    padding: 14px 4px;
+}
+
+.todays-work-stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 12px;
+}
+
+.todays-work-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    background: var(--slate-50);
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+}
+
+.todays-work-stat .stat-icon {
+    color: var(--primary);
+    font-size: 13px;
+    margin-bottom: 2px;
+}
+
+.todays-work-stat strong {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--slate-900);
+    line-height: 1;
+}
+
+.todays-work-stat span {
+    font-size: 11px;
+    color: var(--slate-500);
+    font-weight: 600;
+}
+
+.todays-work-note {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--slate-100);
+    font-size: 12.5px;
+    color: var(--slate-700);
+    line-height: 1.5;
+}
+
+.todays-work-note strong {
+    color: var(--slate-900);
+}
+
+@media (max-width: 640px) {
+    .todays-work-stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

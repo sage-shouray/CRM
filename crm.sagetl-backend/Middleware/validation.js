@@ -22,13 +22,26 @@ const { ALL_ROLES } = require("./roles");
 
 const roles = ALL_ROLES;
 
+// Password policy. 12 characters is the length at which offline cracking of a
+// bcrypt hash stops being cheap; the character-class rule keeps a long but
+// trivial passphrase like "aaaaaaaaaaaa" out.
+const passwordRule = Joi.string()
+  .min(12)
+  .max(100)
+  .pattern(/[A-Za-z]/, "a letter")
+  .pattern(/[0-9]/, "a number")
+  .messages({
+    "string.min": "Password must be at least 12 characters",
+    "string.pattern.name": "Password must contain {#name}",
+  });
+
 const createUserSchema = Joi.object({
   firstName: Joi.string().trim().min(1).max(100).required(),
   lastName: Joi.string().trim().min(1).max(100).required(),
   designation: Joi.string().trim().max(100).allow("", null),
   email: Joi.string().email().required(),
   mobile: Joi.string().trim().max(20).allow("", null),
-  password: Joi.string().min(4).max(100).required(),
+  password: passwordRule.required(),
   role: Joi.string().valid(...roles).required(),
   supervisor: Joi.alternatives(Joi.number(), Joi.string().allow(""), null),
   status: Joi.string().valid("active", "inactive"),
@@ -40,7 +53,7 @@ const updateUserSchema = Joi.object({
   designation: Joi.string().trim().max(100).allow("", null),
   email: Joi.string().email(),
   mobile: Joi.string().trim().max(20).allow("", null),
-  password: Joi.string().min(4).max(100),
+  password: passwordRule,
   role: Joi.string().valid(...roles),
   supervisor: Joi.alternatives(Joi.number(), Joi.string().allow(""), null),
   status: Joi.string().valid("active", "inactive"),
@@ -56,6 +69,9 @@ const taskSchema = Joi.object({
   priority: Joi.string().max(20).allow("", null),
   category: Joi.string().max(50).allow("", null),
   status: Joi.string().max(20).allow("", null),
+  // Who the task is for. Omitted means the caller keeps it. The route checks
+  // that the target is actually below the caller.
+  assignedTo: Joi.number().integer().positive().allow(null),
 });
 
 module.exports = {

@@ -175,6 +175,84 @@ const CompanyNameField = ({ field, value, onChange, error, onDuplicateChange }) 
   );
 };
 
+// An option is either a user object (leadAssignedTo — id + name) or a bare
+// string (bdm — just a name, stored as-is with no id behind it).
+const optionId = (o) => String(typeof o === "object" && o !== null ? o._id ?? o.id : o);
+const optionLabel = (o) =>
+  typeof o === "object" && o !== null
+    ? `${o.firstName || ""} ${o.lastName || ""}`.trim() + (o.designation ? ` — ${o.designation}` : "")
+    : String(o);
+
+// Checkbox dropdown for selecting several values at once (multiple BDMs, or
+// several people a lead is assigned to). Stores an array on the form, in
+// place of the single-value <select> every other field on this form uses.
+const MultiSelectField = ({ field, selectedIds, allOptions, onChange, hasError }) => {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+  const ids = Array.isArray(selectedIds) ? selectedIds.map(String) : [];
+
+  useEffect(() => {
+    const onDocMouseDown = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, []);
+
+  const toggleId = (id) => {
+    const idStr = String(id);
+    const next = ids.includes(idStr)
+      ? ids.filter((v) => v !== idStr)
+      : [...ids, idStr];
+    onChange(next);
+  };
+
+  const selectedOptions = allOptions.filter((o) => ids.includes(optionId(o)));
+  const summary =
+    selectedOptions.length === 0
+      ? `Select ${field.label}`
+      : selectedOptions.map(optionLabel).join(", ");
+
+  return (
+    <div className="multiselect-field" ref={containerRef}>
+      <button
+        type="button"
+        className={`multiselect-toggle ${hasError ? "mandatory" : ""}`}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className={selectedOptions.length === 0 ? "multiselect-placeholder" : ""}>
+          {summary}
+        </span>
+        <span className="multiselect-caret">▾</span>
+      </button>
+
+      {open && (
+        <div className="multiselect-menu">
+          {allOptions.length === 0 ? (
+            <div className="multiselect-empty">No options available</div>
+          ) : (
+            allOptions.map((o) => {
+              const id = optionId(o);
+              return (
+                <label key={id} className="multiselect-option">
+                  <input
+                    type="checkbox"
+                    checked={ids.includes(id)}
+                    onChange={() => toggleId(id)}
+                  />
+                  <span>{optionLabel(o)}</span>
+                </label>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const FormGroup = ({
   field,
   formData,
@@ -262,6 +340,14 @@ const FormGroup = ({
             className={errors[field.name] ? "mandatory" : ""}
           />
         )
+      ) : field.type === "multiselect" ? (
+        <MultiSelectField
+          field={field}
+          selectedIds={formData[field.name]}
+          allOptions={options[field.options] || []}
+          onChange={(ids) => handleChange({ target: { name: field.name, value: ids } })}
+          hasError={!!errors[field.name]}
+        />
       ) : field.type === "select" ? (
         <>
           <div className="select-with-date">
@@ -428,7 +514,7 @@ const CreateLeads = () => {
         const allUsers = userNamesResponse.data || [];
         const bdmNames = allUsers
           // BDM is a role now, not a free-text designation.
-          .filter((user) => normalizeRole(user.role) === ROLES.BDM)
+          .filter((user) => normalizeRole(user.role) === ROLES.MANAGER)
           .map(user => user.firstName);
         const allUserNames = allUsers.map(user => user.firstName);
         setOptions((prevOptions) => ({
@@ -620,6 +706,33 @@ const CreateLeads = () => {
     contactFormConfig.forEach((role) => {
       validateSection(role.fields, formData.contact, "contact");
     });
+
+    // At least one contact must be reachable. Any single role will do, but a
+    // bare name is not a contact — it needs a phone or an email with it,
+    // otherwise the lead is unusable to whoever picks it up next.
+    const contact = formData.contact || {};
+    const filled = (v) => Boolean(v && v.toString().trim());
+    const contactRoles = [
+      { prefix: "it", label: "IT" },
+      { prefix: "finance", label: "Finance" },
+      { prefix: "businessHead", label: "Business Head" },
+    ];
+    const hasUsableContact = contactRoles.some(({ prefix }) => {
+      const hasName = filled(contact[`${prefix}Name`]);
+      const hasReach =
+        filled(contact[`${prefix}DlExt`]) ||
+        filled(contact[`${prefix}Mobile`]) ||
+        filled(contact[`${prefix}Email`]) ||
+        filled(contact[`${prefix}PersonalEmail`]);
+      return hasName && hasReach;
+    });
+
+    if (!hasUsableContact) {
+      newErrors.contactRequired =
+        "Add at least one contact — a name plus a phone number or email, in any one of IT, Finance or Business Head.";
+      // Highlight the first block so the message has something to point at.
+      newErrors.itName = "Required if no other contact is filled";
+    }
     Object.entries(itLandscapeConfig).forEach(([section, fields]) => {
       const selectedType = formData.company?.leadType;
       // Validate only the IT Landscape block that is actually on screen. A lead
@@ -636,7 +749,7 @@ const CreateLeads = () => {
 
     if (!formData.description.trim())
       newErrors.description = "Description is required";
-    if (!file) newErrors.file = "File is required";
+    // An attachment is optional — a lead can be created without one.
     if (!formData.selectedOption)
       newErrors.selectedOption = "Present Conversation Level is required";
     if (!formData.radioValue)
@@ -748,7 +861,16 @@ const CreateLeads = () => {
         <section className="form-section">
           <div className="section-header-box">
             <h1>Contact Information</h1>
+            <p className="section-subtext">
+              At least one contact is required — a name plus a phone number or
+              email, in any one of the three blocks below.
+            </p>
           </div>
+          {errors.contactRequired && (
+            <p className="error contact-required-error">
+              {errors.contactRequired}
+            </p>
+          )}
           {contactFormConfig.map((role, roleIndex) => (
             <div key={roleIndex} className="contact-role-block">
               <h2>{role.role} Contact</h2>
@@ -851,7 +973,7 @@ const CreateLeads = () => {
               {/* Row 1: Using ERP | Budget | Opportunity */}
               <FormRow>
                 <div className="form-group">
-                  <label htmlFor="usingERP">Using ERP:</label>
+                  <label htmlFor="usingERP">Using ERP: <span className="req-star">*</span></label>
                   <select
                     name="usingERP"
                     id="usingERP"
@@ -875,7 +997,7 @@ const CreateLeads = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="opportunityForUs1">Opportunity:</label>
+                  <label htmlFor="opportunityForUs1">Opportunity: <span className="req-star">*</span></label>
                   <select
                     name="opportunityForUs1"
                     id="opportunityForUs1"
@@ -995,7 +1117,7 @@ const CreateLeads = () => {
               {/* Row 1: Opportunity for us available | Year of Implementation | No. of Users */}
               <FormRow>
                 <div className="form-group">
-                  <label htmlFor="opportunityForUs2">Opportunity for us available:</label>
+                  <label htmlFor="opportunityForUs2">Opportunity for us available: <span className="req-star">*</span></label>
                   <select
                     name="opportunityForUs2"
                     id="opportunityForUs2"
@@ -1052,16 +1174,16 @@ const CreateLeads = () => {
                 </div>
                 <div className="form-group">
                   <label htmlFor="contractExpiry">Contract Expiry:</label>
-                  <select
+                  {/* Full date — the monthly renewals report needs the day, not
+                      just the year. */}
+                  <input
+                    type="date"
                     name="contractExpiry"
                     id="contractExpiry"
                     value={formData.itLandscape.SAPInstalledBase?.contractExpiry || ""}
                     onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
                     className={errors.contractExpiry ? "mandatory" : ""}
-                  >
-                    <option value="" disabled>Select</option>
-                    {options.expiryOptions?.map((o, i) => <option key={i} value={o}>{o}</option>)}
-                  </select>
+                  />
                 </div>
                 <div className="form-group">
                   <label htmlFor="supportPartner">Support Partner:</label>
@@ -1081,7 +1203,7 @@ const CreateLeads = () => {
               {/* Row 3: Opportunity for (custom dropdown) | Exact Version | Hardware */}
               <FormRow>
                 <div className="form-group">
-                  <label htmlFor="opportunityForUs3">Opportunity for:</label>
+                  <label htmlFor="opportunityForUs3">Opportunity for: <span className="req-star">*</span></label>
                   <select
                     name="opportunityForUs3"
                     id="opportunityForUs3"
@@ -1213,7 +1335,8 @@ const CreateLeads = () => {
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="file">
-                Attachment (PDF or Word): <span className="req-star">*</span>
+                Attachment (PDF or Word):{" "}
+                <span className="optional-note">optional</span>
               </label>
               <input
                 type="file"
@@ -1221,10 +1344,8 @@ const CreateLeads = () => {
                 name="file"
                 accept=".pdf,.doc,.docx"
                 onChange={(e) => setFile(e.target.files[0])}
-                required
                 ref={fileInputRef}
               />
-              {errors.file && <span className="error">{errors.file}</span>}
             </div>
 
             <div className="form-group">

@@ -1,0 +1,244 @@
+/* "My daily work report" — today's entry, plus a read-only history. */
+
+.daily-log-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.daily-log-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.daily-log-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--slate-900, #0f172a);
+}
+
+.daily-log-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--slate-500, #64748b);
+}
+
+.daily-log-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--primary, #4f46e5);
+  color: #fff;
+  font-size: 17px;
+}
+
+.daily-log-alert {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  border-radius: 9px;
+  border: 1px solid;
+  border-left-width: 4px;
+  font-size: 13px;
+}
+
+.daily-log-alert.is-error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.daily-log-alert.is-success {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.daily-log-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid var(--slate-200, #e2e8f0);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.daily-log-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.daily-log-card-head h2 {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--slate-800, #1e293b);
+}
+
+.daily-log-pill {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.daily-log-pill.is-done {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.daily-log-pill.is-pending {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.daily-log-card label,
+.daily-log-hours label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--slate-700, #334155);
+}
+
+.daily-log-card textarea,
+.daily-log-hours input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 13px;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--slate-900, #0f172a);
+  border: 1.5px solid var(--slate-200, #e2e8f0);
+  border-radius: 9px;
+  background: #fff;
+  resize: vertical;
+}
+
+.daily-log-card textarea:focus,
+.daily-log-hours input:focus {
+  outline: none;
+  border-color: var(--primary, #4f46e5);
+  box-shadow: 0 0 0 3px var(--primary-glow, rgba(79, 70, 229, 0.14));
+}
+
+.daily-log-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.daily-log-hours {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 180px;
+}
+
+.daily-log-row button {
+  padding: 11px 22px;
+  font-size: 13.5px;
+  font-family: inherit;
+  font-weight: 700;
+  color: #fff;
+  background: var(--primary, #4f46e5);
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.daily-log-row button:hover:not(:disabled) {
+  background: var(--primary-hover, #4338ca);
+}
+
+.daily-log-row button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.daily-log-note {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--slate-500, #64748b);
+}
+
+.daily-log-history h2 {
+  margin: 8px 0 4px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--slate-500, #64748b);
+}
+
+.daily-log-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--slate-500, #64748b);
+}
+
+/* Past entries read as a record: muted, and visibly locked. */
+.daily-log-past {
+  padding: 13px 16px;
+  margin-bottom: 8px;
+  background: var(--slate-50, #f8fafc);
+  border: 1px solid var(--slate-200, #e2e8f0);
+  border-radius: 11px;
+}
+
+.daily-log-past header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 5px;
+  font-size: 12.5px;
+  color: var(--slate-700, #334155);
+}
+
+.daily-log-locked {
+  font-size: 11px;
+  color: var(--slate-400, #94a3b8);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.daily-log-past p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--slate-700, #334155);
+  white-space: pre-wrap;
+}
+
+@media (max-width: 640px) {
+  .daily-log-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .daily-log-hours {
+    max-width: none;
+  }
+}

@@ -2,43 +2,42 @@
 // Must stay in step with crm.sagetl-backend/Middleware/roles.js.
 
 export const ROLES = {
-  SUPER_ADMIN: "superadmin",
   ADMIN: "admin",
-  BDM: "bdm",
-  BUSINESS_LEAD: "businesslead",
+  MANAGER: "manager",
+  EXECUTIVE: "executive",
 };
 
 // Most privileged first.
 export const ROLE_ORDER = [
-  ROLES.SUPER_ADMIN,
   ROLES.ADMIN,
-  ROLES.BDM,
-  ROLES.BUSINESS_LEAD,
+  ROLES.MANAGER,
+  ROLES.EXECUTIVE,
 ];
 
 export const ALL_ROLES = [...ROLE_ORDER];
 
 export const ROLE_LABELS = {
-  [ROLES.SUPER_ADMIN]: "Super Admin",
   [ROLES.ADMIN]: "Admin",
-  [ROLES.BDM]: "Business Development Manager",
-  [ROLES.BUSINESS_LEAD]: "Business Lead",
+  [ROLES.MANAGER]: "Manager",
+  [ROLES.EXECUTIVE]: "Executive",
 };
 
 // Compact labels for tight spaces such as table cells and the header badge.
 export const ROLE_SHORT_LABELS = {
-  [ROLES.SUPER_ADMIN]: "Super Admin",
   [ROLES.ADMIN]: "Admin",
-  [ROLES.BDM]: "BDM",
-  [ROLES.BUSINESS_LEAD]: "Business Lead",
+  [ROLES.MANAGER]: "Manager",
+  [ROLES.EXECUTIVE]: "Executive",
 };
 
 // Retired three-tier names. "admin" is intentionally absent — it is still a
 // valid role today with a different meaning, so mapping it here would silently
 // promote every Admin to Super Admin.
 const RETIRED_ROLES = {
-  supervisor: ROLES.BDM,
-  subuser: ROLES.BUSINESS_LEAD,
+  superadmin: ROLES.ADMIN,
+  supervisor: ROLES.MANAGER,
+  bdm: ROLES.MANAGER,
+  subuser: ROLES.EXECUTIVE,
+  businesslead: ROLES.EXECUTIVE,
 };
 
 // A session stored before the change keeps working until the token expires.
@@ -58,12 +57,14 @@ export const rankOf = (role) => {
   return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 };
 
-export const isSuperAdmin = (role) => normalizeRole(role) === ROLES.SUPER_ADMIN;
+export // The top tier sees everything; kept under the old name so the many call
+// sites that ask "is this the unrestricted role?" keep reading naturally.
+const isSuperAdmin = (role) => normalizeRole(role) === ROLES.ADMIN;
 
 // Tiers that can reach the user-management screens.
 export const canManageUsers = (role) =>
-  [ROLES.SUPER_ADMIN, ROLES.ADMIN].includes(normalizeRole(role));
+  [ROLES.ADMIN].includes(normalizeRole(role));
 
 // Tiers that manage other people's leads (team views, reassignment).
 export const canManageTeam = (role) =>
-  [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.BDM].includes(normalizeRole(role));
+  [ROLES.ADMIN, ROLES.MANAGER].includes(normalizeRole(role));

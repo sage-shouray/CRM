@@ -3,10 +3,25 @@ import axios from "axios";
 import LeadDetails from "../Leads/LeadDetails";
 import "./UnassignedLeads.css"; // Add a dedicated CSS file for this component
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
+import { API_BASE_URL } from "../../config";
+import { useLiveUpdates } from "../../liveUpdates";
+
+// A lead may be assigned to one populated user object (legacy) or several.
+const assignedNames = (lead) => {
+  const raw = lead.companyInfo?.leadAssignedTo;
+  const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  return list
+    .filter((u) => u && typeof u === "object")
+    .map((u) => `${u.firstName || ""} ${u.lastName || ""}`.trim())
+    .filter(Boolean)
+    .join(", ");
+};
 
 const UnassignedLeads = () => {
   const [leads, setLeads] = useState([]);
+  // Bumped by live updates so the queue reflects assignments made elsewhere.
+  const [liveTick, setLiveTick] = useState(0);
+  useLiveUpdates(["leads", "users"], () => setLiveTick((n) => n + 1));
   const [activeUsers, setActiveUsers] = useState([]);
   const [selectedLeads, setSelectedLeads] = useState([]); // State for selected lead IDs
   const [selectedUserId, setSelectedUserId] = useState(""); // State for selected user ID
@@ -72,7 +87,7 @@ const UnassignedLeads = () => {
       }
     };
     fetchLeads();
-  }, [filters]);
+  }, [filters, liveTick]);
 
   // Fetch active users
   useEffect(() => {
@@ -321,9 +336,7 @@ const UnassignedLeads = () => {
                 </button>
               </td>
               <td>{lead.companyInfo?.companyName || ""}</td>
-              <td>{`${lead.companyInfo.leadAssignedTo?.firstName || ""} ${
-                lead.companyInfo.leadAssignedTo?.lastName || ""
-              }`}</td>
+              <td>{assignedNames(lead)}</td>
               <td>{lead.companyInfo?.priority}</td>
               <td>
                 {lead.createdBy?.firstName || ""}{" "}

@@ -100,13 +100,13 @@
   border: none;
   background: var(--primary-gradient);
   color: white;
-  box-shadow: 0 4px 12px rgba(211, 100, 11, 0.2);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
   transition: all var(--transition-fast);
   margin-top: 10px;
 }
 
 .form-section-ld button:hover {
-  box-shadow: 0 6px 16px rgba(211, 100, 11, 0.35);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
   transform: translateY(-1px);
 }
 
@@ -199,6 +199,36 @@
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.ld-multiselect-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border: 1.5px solid var(--slate-200);
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ld-multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--slate-700);
+  cursor: pointer;
+}
+
+.ld-multiselect-option input {
+  width: auto !important;
+  margin: 0;
+  accent-color: var(--primary);
 }
 
 .form-group-ld input:disabled,
@@ -295,4 +325,18 @@
   color: #b91c1c;
   font-size: 13px;
   font-weight: 600;
+}
+
+/* Shown in place of the Edit button for someone with read-only access to a
+   lead — every user can open every company, but only the creator, their
+   manager, or an Admin may change one. */
+.lead-readonly-note {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12.5px;
+  font-style: italic;
 }

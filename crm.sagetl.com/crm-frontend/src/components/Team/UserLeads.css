@@ -20,17 +20,6 @@
   display: inline-block;
 }
 
-.user-heading::after {
-  content: '';
-  position: absolute;
-  bottom: -6px;
-  left: 0;
-  width: 40px;
-  height: 3px;
-  background: var(--primary-gradient);
-  border-radius: 2px;
-}
-
 .table-container {
   margin-top: 10px;
   padding: 0;
@@ -78,8 +67,10 @@
   background-color: var(--slate-50);
 }
 
-/* Button style */
-.display-button {
+/* Button style. Named for this component: a generic `.display-button` here
+   collided with the text-link button of the same name in Display.css and
+   turned the Leads table's company names into orange pills. */
+.user-leads-button {
   background: var(--primary-gradient);
   color: white;
   border: none;
@@ -88,12 +79,12 @@
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(211, 100, 11, 0.15);
+  box-shadow: 0 4px 10px rgba(79, 70, 229, 0.15);
   transition: all var(--transition-fast);
 }
 
-.display-button:hover {
-  box-shadow: 0 6px 14px rgba(211, 100, 11, 0.3);
+.user-leads-button:hover {
+  box-shadow: 0 6px 14px rgba(79, 70, 229, 0.3);
   transform: translateY(-1px);
 }
 

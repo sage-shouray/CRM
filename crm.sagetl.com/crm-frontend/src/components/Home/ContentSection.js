@@ -114,9 +114,9 @@ const ContentSection = ({ userRole }) => {
 
   return (
     <div className="content-container">
-      {(role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN) && renderAdminContent()}
-      {role === ROLES.BDM && renderSupervisorContent()}
-      {role === ROLES.BUSINESS_LEAD && renderSubuserContent()}
+      {(role === ROLES.ADMIN || role === ROLES.ADMIN) && renderAdminContent()}
+      {role === ROLES.MANAGER && renderSupervisorContent()}
+      {role === ROLES.EXECUTIVE && renderSubuserContent()}
     </div>
   );
 };

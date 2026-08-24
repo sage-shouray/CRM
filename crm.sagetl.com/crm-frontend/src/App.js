@@ -1,4 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import useHeartbeat from "./useHeartbeat";
 import "./App.css";
 import { useState } from "react";
 import Login from "./components/Login/Login";
@@ -11,6 +13,10 @@ import LayoutWithoutHeader from "./components/Layouts/LayoutWithoutHeader";
 import CreateLeads from "./components/CreateLeads/CreateLeads";
 import Display from "./components/Leads/Display";
 import Companies from "./components/Companies/Companies";
+import ReportsPage from "./components/Reports/ReportsPage";
+import AuditPage from "./components/Audit/AuditPage";
+import PermissionsPage from "./components/Permissions/PermissionsPage";
+import PipelinePage from "./components/Pipeline/PipelinePage";
 import LeadDetails from "./components/Leads/LeadDetails";
 import AdminDashboard from "./components/Admin/AdminDashboard";
 import ToDo from './components/ToDo/ToDo';
@@ -24,10 +30,14 @@ import UserLeads from "./components/Team/UserLeads";
 import UnassignedLeads from "./components/Supervisor/UnassignedLeads";
 import MultipleAssign from "./components/Supervisor/MultipleAssign";
 import Chat from "./components/Chat/Chat";
+import DailyLog from "./components/DailyLog/DailyLog";
 import { isAuthenticated as isAuthValid, getUserRole, clearSession } from "./authStorage";
 import { ROLES, ALL_ROLES } from "./roles";
 
 function App() {
+  // Records presence (active vs idle) while the app is open.
+  useHeartbeat();
+
   const [isAuthenticated, setIsAuthenticated] = useState(isAuthValid());
   const [userRole, setUserRole] = useState(getUserRole());
 
@@ -54,6 +64,15 @@ function App() {
         setIsAuthenticated={setIsAuthenticated}
         setUserRole={setUserRole}
       />
+      {/* Exactly one ToastContainer for the whole app. react-toastify keys its
+          containers by containerId (default 1), so a second one mounted at the
+          same time silently replaces the first in that registry — and any toast
+          belonging to the displaced container then crashes on render with
+          "Cannot set properties of undefined (setting 'toggle')". Header and
+          Home each used to render their own, and both are mounted together in
+          LayoutWithHeader. toast() is global, so every existing call still
+          works with this single container. */}
+      <ToastContainer />
       <Routes>
         <Route element={<LayoutWithoutHeader />}>
           <Route path="/" element={<Navigate to="/login" replace />} />
@@ -95,6 +114,42 @@ function App() {
               <PrivateRoute
                 element={<Display />}
                 allowedRoles={ALL_ROLES}
+              />
+            }
+          />
+          <Route
+            path="/pipeline"
+            element={
+              <PrivateRoute
+                element={<PipelinePage />}
+                allowedRoles={ALL_ROLES}
+              />
+            }
+          />
+          <Route
+            path="/permissions"
+            element={
+              <PrivateRoute
+                element={<PermissionsPage />}
+                allowedRoles={[ROLES.ADMIN]}
+              />
+            }
+          />
+          <Route
+            path="/audit"
+            element={
+              <PrivateRoute
+                element={<AuditPage />}
+                allowedRoles={[ROLES.ADMIN]}
+              />
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <PrivateRoute
+                element={<ReportsPage />}
+                allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}
               />
             }
           />
@@ -157,7 +212,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<AdminDashboard />}
-                allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN]}
+                allowedRoles={[ROLES.ADMIN]}
               />
             }
           />
@@ -166,7 +221,10 @@ function App() {
           <Route
             path="/add-user"
             element={
-              <PrivateRoute element={<AddUser />} allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN]} />
+              <PrivateRoute
+                element={<AddUser />}
+                allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}
+              />
             }
           />
           <Route
@@ -178,7 +236,7 @@ function App() {
                     <UserTable />
                   </ErrorBoundary>
                 }
-                allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN]}
+                allowedRoles={[ROLES.ADMIN]}
               />
             }
           />
@@ -187,7 +245,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<TeamOverview />}
-                allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.BDM]}
+                allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}
               />
             }
           />
@@ -196,7 +254,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<UserLeads />}
-                allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.BDM]}
+                allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}
               />
             }
           />
@@ -205,7 +263,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<UnassignedLeads />}
-                allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.BDM]}
+                allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}
               />
             }
           />
@@ -214,7 +272,7 @@ function App() {
             element={
               <PrivateRoute
                 element={<MultipleAssign />}
-                allowedRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.BDM]}
+                allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}
               />
             }
           /> 
@@ -223,6 +281,15 @@ function App() {
             element={
               <PrivateRoute
                 element={<Chat />}
+                allowedRoles={ALL_ROLES}
+              />
+            }
+          />
+          <Route
+            path="/daily-log"
+            element={
+              <PrivateRoute
+                element={<DailyLog />}
                 allowedRoles={ALL_ROLES}
               />
             }

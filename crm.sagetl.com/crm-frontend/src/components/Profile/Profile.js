@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { ROLES, normalizeRole, roleLabel } from "../../roles";
-import { ToastContainer } from "react-toastify";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
   faUser, 
@@ -26,7 +25,7 @@ import {
 import { handleError, handleSuccess } from "../../utils";
 import "./Profile.css";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
+import { API_BASE_URL } from "../../config";
 
 function Profile() {
   const [profileData, setProfileData] = useState(null);
@@ -58,7 +57,10 @@ function Profile() {
         setIsLoading(false);
         return;
       }
-      const response = await fetch(`${API_BASE_URL}/auth/profile/${userId}`);
+      const token = sessionStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/auth/profile/${userId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const data = await response.json();
       if (data.success) {
         setProfileData(data.user);
@@ -69,7 +71,7 @@ function Profile() {
           firstName: sessionStorage.getItem("loggedInUser") || "User",
           lastName: "",
           email: "Logged in via portal",
-          role: storedRole || ROLES.BUSINESS_LEAD,
+          role: storedRole || ROLES.EXECUTIVE,
           designation: storedRole ? roleLabel(storedRole) : "Member",
           mobile: "N/A",
           status: "active"
@@ -82,7 +84,7 @@ function Profile() {
         firstName: sessionStorage.getItem("loggedInUser") || "User",
         lastName: "",
         email: "Logged in via portal",
-        role: storedRole || ROLES.BUSINESS_LEAD,
+        role: storedRole || ROLES.EXECUTIVE,
         designation: storedRole ? roleLabel(storedRole) : "Member",
         mobile: "N/A",
         status: "active"
@@ -144,7 +146,7 @@ function Profile() {
 
   const getRoleCapabilities = (role) => {
     const r = normalizeRole(role);
-    if (r === ROLES.SUPER_ADMIN || r === ROLES.ADMIN) {
+    if (r === ROLES.ADMIN || r === ROLES.ADMIN) {
       return [
         {
           title: "User Management & Access Control",
@@ -167,7 +169,7 @@ function Profile() {
           icon: faTasks
         }
       ];
-    } else if (r === ROLES.BDM) {
+    } else if (r === ROLES.MANAGER) {
       return [
         {
           title: "Team Overview & Delegation",
@@ -225,7 +227,7 @@ function Profile() {
     );
   }
 
-  const role = normalizeRole(profileData?.role || storedRole) || ROLES.BUSINESS_LEAD;
+  const role = normalizeRole(profileData?.role || storedRole) || ROLES.EXECUTIVE;
   const fullName = `${profileData?.firstName || ''} ${profileData?.lastName || ''}`.trim() || sessionStorage.getItem("loggedInUser") || "User Profile";
   const initials = (profileData?.firstName?.[0] || '') + (profileData?.lastName?.[0] || profileData?.firstName?.[1] || '');
 
@@ -485,7 +487,6 @@ function Profile() {
         </div>
       </div>
 
-      <ToastContainer />
     </div>
   );
 }

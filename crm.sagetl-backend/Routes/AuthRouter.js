@@ -78,7 +78,7 @@ router.post("/login", loginValidation, async (req, res) => {
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 router.post("/change-password", authenticateToken, changePassword);
-router.get("/profile/:userId", getUserProfile);
+router.get("/profile/:userId", authenticateToken, getUserProfile);
 
 
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config";
 import { roleLabel } from "../../roles";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -15,7 +16,6 @@ const TeamOverview = () => {
 
   const fetchUsers = async () => {
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100';
       const response = await axios.get(
         `${API_BASE_URL}/api/team-overview`,
         {
@@ -40,7 +40,7 @@ const TeamOverview = () => {
       <h1 className="user-heading">Team Overview</h1>
       {error && <p className="error-message">{error}</p>}
       <div>
-        <table>
+        <table className="user-table">
           <thead>
             <tr>
               <th>First Name</th>
