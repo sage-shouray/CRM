@@ -1867,6 +1867,23 @@ app.put("/api/users/:userId", authenticateToken, checkRole([ROLES.ADMIN]), valid
         .json({ error: "Only a Super Admin can manage a Super Admin." });
     }
 
+    // An Admin account's role can never be changed — by another Admin, or by
+    // itself. rejectSuperAdminChanges above only stops a lower tier from
+    // touching an Admin; it does nothing when the actor is already an Admin,
+    // which is exactly how an Admin can accidentally demote themselves (or
+    // another Admin) with no way back in except direct database access. The
+    // account can still be deactivated if it needs to lose access.
+    if (
+      isSuperAdmin(target.role) &&
+      req.body.role !== undefined &&
+      normalizeRole(req.body.role) !== ROLES.ADMIN
+    ) {
+      return res.status(403).json({
+        error:
+          "An Admin account's role cannot be changed. Deactivate the account instead if it should lose access.",
+      });
+    }
+
     // Whitelist updatable fields to prevent mass assignment.
     const allowed = ["firstName", "lastName", "designation", "email", "mobile", "role", "supervisor", "status"];
     const update = {};

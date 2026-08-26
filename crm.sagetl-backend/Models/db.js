@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const { ROLE_LABELS, ROLES } = require('../Middleware/roles');
+const { ROLE_LABELS, ROLES, normalizeRole } = require('../Middleware/roles');
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/crm';
 const pool = new Pool({ connectionString });
@@ -1173,14 +1173,20 @@ async function initializeDB() {
         const nameParts = u.name.split(' ');
         const firstName = nameParts[0];
         const lastName = nameParts.slice(1).join(' ') || 'User';
-        const designation = u.designation || ROLE_LABELS[u.role] || 'Business Lead';
+        // Users.json is a long-lived, committed seed file and still carries
+        // the three-tier names from before the role model changed
+        // ("superadmin", "businesslead"). The users_role_valid constraint
+        // only accepts the current tiers, so the retired name has to be
+        // translated on the way in rather than inserted verbatim.
+        const role = normalizeRole(u.role);
+        const designation = u.designation || ROLE_LABELS[role] || 'Business Lead';
         const mobile = '1234567890';
-        
+
         const insertRes = await pool.query(`
           INSERT INTO users (first_name, last_name, designation, email, mobile, password, role, status)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           RETURNING id
-        `, [firstName, lastName, designation, u.email, mobile, hashedPassword, u.role, 'active']);
+        `, [firstName, lastName, designation, u.email, mobile, hashedPassword, role, 'active']);
         
         emailToId[u.email] = insertRes.rows[0].id;
       }
@@ -1318,15 +1324,28 @@ async function initializeDB() {
       conversationLevelOptions: ["C-level", "Manager-level"]
     };
 
-    const optionsCount = await pool.query('SELECT COUNT(*) FROM options');
-    if (parseInt(optionsCount.rows[0].count, 10) === 0) {
+    const optionsRow = await pool.query('SELECT data FROM options LIMIT 1');
+    if (optionsRow.rowCount === 0) {
       console.log("Seeding default option values...");
       await pool.query('INSERT INTO options (data) VALUES ($1)', [defaultOptions]);
       console.log("Option values seeded.");
     } else {
-      console.log("Updating option values to ensure vertical options are fresh...");
-      await pool.query('UPDATE options SET data = $1', [defaultOptions]);
-      console.log("Option values updated.");
+      // This used to overwrite the whole row with defaultOptions on every
+      // boot, which meant any custom dropdown value an Admin added through
+      // the app (a new vertical, a new lead source, ...) was silently wiped
+      // out the next time the server restarted. Merge instead: every default
+      // category is guaranteed to exist, but a category that is already
+      // present keeps whatever values it has, plus anything new from the
+      // defaults that isn't there yet. Nothing an Admin has added is ever
+      // dropped by this step.
+      const existing = optionsRow.rows[0].data || {};
+      const merged = { ...existing };
+      for (const [key, values] of Object.entries(defaultOptions)) {
+        const current = Array.isArray(merged[key]) ? merged[key] : [];
+        merged[key] = [...current, ...values.filter((v) => !current.includes(v))];
+      }
+      await pool.query('UPDATE options SET data = $1', [merged]);
+      console.log("Option values merged (custom values preserved).");
     }
   } catch (err) {
     console.error("Database initialization error:", err);

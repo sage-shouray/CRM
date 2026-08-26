@@ -103,18 +103,21 @@ export const companyFormConfig = [
       label: "Country",
       type: "select",
       isCascadingCountry: true,
+      required: true,
     },
     {
       name: "state",
       label: "State",
       type: "select",
       isCascadingState: true,
+      required: true,
     },
     {
       name: "city",
       label: "City",
       type: "select",
       isCascadingCity: true,
+      required: true,
     },
   ],
 ];

@@ -265,6 +265,9 @@ const Display = () => {
             <th>Lead Number</th>
             <th>Creation Date</th>
             <th>Company Name</th>
+            <th>Country</th>
+            <th>State</th>
+            <th>City</th>
             <th>Latest Description Date</th>
             <th>Created By</th>
             <th>Assign To</th>
@@ -299,6 +302,9 @@ const Display = () => {
                   ""
                 )}
               </td>
+              <td>{lead.companyInfo?.country || ""}</td>
+              <td>{lead.companyInfo?.state || ""}</td>
+              <td>{lead.companyInfo?.city || ""}</td>
               <td>{getLatestDescriptionDate(lead)}</td>
               <td>{lead.createdBy?.firstName || ""}</td>
               <td>{getAssignedUser(lead)}</td>
