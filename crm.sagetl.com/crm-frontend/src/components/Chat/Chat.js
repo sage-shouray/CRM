@@ -20,7 +20,8 @@ import {
   faFilePdf,
   faFileExcel,
   faDownload,
-  faChevronDown
+  faChevronDown,
+  faArrowLeft
 } from "@fortawesome/free-solid-svg-icons";
 import { io } from "socket.io-client";
 import "./Chat.css";
@@ -32,6 +33,10 @@ const Chat = () => {
   const [groups, setGroups] = useState([]);
   const [activeTab, setActiveTab] = useState("all"); // 'all', 'direct', 'groups', 'global'
   const [selectedChat, setSelectedChat] = useState({ type: "global" }); // { type: 'global' | 'direct' | 'group', targetId, name, role, details }
+  // Below the mobile breakpoint there is only room for one pane. This tracks
+  // which one is showing; picking a conversation switches to it, and a back
+  // button (rendered only on mobile via CSS) switches back to the list.
+  const [mobileShowChat, setMobileShowChat] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -622,7 +627,7 @@ const Chat = () => {
   };
 
   return (
-    <div className="chat-container">
+    <div className={`chat-container ${mobileShowChat ? "mobile-show-chat" : ""}`}>
       {/* Sidebar Conversation Panel */}
       <div className="chat-sidebar">
         <div className="chat-sidebar-header">
@@ -681,13 +686,14 @@ const Chat = () => {
           {(activeTab === "all" || activeTab === "global") && (
             <div
               className={`chat-list-item global-item ${selectedChat.type === "global" ? "active" : ""} ${unread.global > 0 ? "has-unread" : ""}`}
-              onClick={() =>
+              onClick={() => {
+                setMobileShowChat(true);
                 setSelectedChat({
                   type: "global",
                   name: "Global Announcements",
                   details: "Official Company Broadcast"
-                })
-              }
+                });
+              }}
             >
               <div className="chat-avatar global-avatar">
                 <FontAwesomeIcon icon={faBullhorn} />
@@ -718,14 +724,15 @@ const Chat = () => {
                 <div
                   key={`group-${g.id}`}
                   className={`chat-list-item ${selectedChat.type === "group" && selectedChat.targetId === g.id ? "active" : ""} ${groupUnread > 0 ? "has-unread" : ""}`}
-                  onClick={() =>
+                  onClick={() => {
+                    setMobileShowChat(true);
                     setSelectedChat({
                       type: "group",
                       targetId: g.id,
                       name: g.name,
                       details: `${g.members?.length || 0} Members`
-                    })
-                  }
+                    });
+                  }}
                 >
                   <div className="chat-avatar group-avatar">
                     <FontAwesomeIcon icon={faUsers} />
@@ -763,15 +770,16 @@ const Chat = () => {
                 <div
                   key={`user-${u.id}`}
                   className={`chat-list-item ${selectedChat.type === "direct" && selectedChat.targetId === u.id ? "active" : ""} ${userUnread > 0 ? "has-unread" : ""}`}
-                  onClick={() =>
+                  onClick={() => {
+                    setMobileShowChat(true);
                     setSelectedChat({
                       type: "direct",
                       targetId: u.id,
                       name: u.name,
                       role: u.role,
                       details: u.designation || u.role.toUpperCase()
-                    })
-                  }
+                    });
+                  }}
                 >
                   <div className={`chat-avatar user-avatar avatar-role-${u.role}`}>
                     {u.name.substring(0, 2).toUpperCase()}
@@ -805,6 +813,15 @@ const Chat = () => {
       <div className="chat-main-window">
         {/* Active Chat Header */}
         <div className="chat-main-header">
+          <button
+            type="button"
+            className="chat-back-btn"
+            onClick={() => setMobileShowChat(false)}
+            title="Back to chats"
+            aria-label="Back to chats"
+          >
+            <FontAwesomeIcon icon={faArrowLeft} />
+          </button>
           <div className="active-chat-info">
             <div className={`chat-avatar ${selectedChat.type === 'global' ? 'global-avatar' : selectedChat.type === 'group' ? 'group-avatar' : `user-avatar avatar-role-${selectedChat.role}`}`}>
               {selectedChat.type === 'global' ? (

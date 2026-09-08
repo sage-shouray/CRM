@@ -2,6 +2,7 @@ import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faClock } from "@fortawesome/free-solid-svg-icons";
 import { OPEN_STAGES, stageOf, isOverdue } from "../Home/pipeline";
+import { formatDayMonth as fmtDate } from "../../dateFormat";
 
 // Stage columns, plus Closed-Won at the end. The accent is used only on the
 // column header — cards stay neutral so a wall of them reads calmly.
@@ -9,14 +10,6 @@ const COLUMNS = [
   ...OPEN_STAGES.map((s, i) => ({ ...s, accent: `stage-${i + 1}` })),
   { key: "won", label: "Closed-Won", accent: "stage-won" },
 ];
-
-const fmtDate = (value) => {
-  if (!value) return "";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime())
-    ? ""
-    : d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-};
 
 const latestAction = (lead) => {
   const notes = (lead.descriptions || []).filter((d) => d && d.description);

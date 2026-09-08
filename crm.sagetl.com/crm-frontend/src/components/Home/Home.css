@@ -7,19 +7,27 @@
     --dash-scale: 1;
     --dash-max-width: 1400px;
     zoom: var(--dash-scale);
-    padding: 8px 16px;
+    padding: 6px 16px;
     max-width: var(--dash-max-width);
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     font-family: inherit;
     box-sizing: border-box;
     /* Fill the content area, whatever height it happens to be. This used to
        subtract a hard-coded 56px for the top bar — which is wrong the moment
        the bar wraps to two rows on a narrow screen, and pushed the layout off
-       the bottom. Divided by the scale so zoom does not overshoot. */
-    height: calc(100% / var(--dash-scale));
+       the bottom.
+       Plain 100%, not divided by the scale: a browser already resolves a
+       percentage height *inside* a zoomed element against the parent's size
+       pre-divided by that same zoom factor once on its own — dividing again
+       here double-compensated, under-filling the container by exactly
+       (1 - 1/scale) of the available height and leaving a dead strip at the
+       bottom the moment --dash-scale was anything other than 1. Measured
+       live: a --dash-scale of 1.08 was leaving 63px unfilled out of 845px
+       of actual available height. */
+    height: 100%;
     overflow: hidden;
 }
 
@@ -742,6 +750,12 @@
 .workspace-grid {
     display: grid;
     grid-template-columns: 1fr;
+    /* Without an explicit row height, an auto-sized grid row only grows to
+       fit its content — .wd-panel's `height: 100%` then has nothing solid
+       to fill, and the panel shrinks to its content instead of the space
+       actually available, leaving the rest of this flex item as dead space
+       below it. One explicit row, filling the grid's own height exactly. */
+    grid-template-rows: minmax(0, 1fr);
     gap: 12px;
     flex: 1;
     min-height: 0;
@@ -796,6 +810,39 @@
 }
 
 /* ---- filter chips ---- */
+.wd-view-as {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--slate-100);
+    background: var(--primary-light);
+    flex-shrink: 0;
+}
+
+.wd-view-as label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--primary-hover);
+}
+
+.wd-view-as select {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--slate-800);
+    border: 1.5px solid var(--primary-border);
+    border-radius: var(--radius-xs);
+    padding: 4px 8px;
+    background: #ffffff;
+    max-width: 220px;
+}
+
+.wd-view-as-loading {
+    font-size: 11px;
+    color: var(--slate-500);
+    font-style: italic;
+}
+
 .wd-filters {
     display: flex;
     align-items: center;
@@ -860,6 +907,35 @@
     display: flex;
     flex-direction: column;
     gap: 7px;
+}
+
+/* Absorbs whatever space is left under a short list, so a panel with only
+   one or two cards reads as "caught up" rather than as cut off early. */
+.wd-list-tail {
+    flex: 1;
+    min-height: 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--slate-300);
+    text-align: center;
+}
+
+.wd-list-tail-icon {
+    font-size: 20px;
+    color: var(--success-border);
+    background: var(--success-bg);
+    padding: 10px;
+    border-radius: var(--radius-full);
+}
+
+.wd-list-tail p {
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--slate-400);
 }
 
 .wd-lead-card {

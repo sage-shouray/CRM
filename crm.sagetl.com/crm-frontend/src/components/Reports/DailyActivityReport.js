@@ -8,6 +8,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { ROLES, normalizeRole, roleShortLabel } from "../../roles";
 import { API_BASE_URL } from "../../config";
+import { formatDate } from "../../dateFormat";
 import "./DailyActivityReport.css";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -176,7 +177,7 @@ function DailyActivityReport() {
                     key={key}
                     className={r.worklog_submitted ? "" : "dar-missing"}
                   >
-                    <td>{r.day}</td>
+                    <td>{formatDate(r.day)}</td>
                     <td>
                       <strong>{r.name}</strong>
                       <span className="dar-role">{roleShortLabel(r.role)}</span>

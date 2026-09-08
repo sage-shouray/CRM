@@ -20,7 +20,7 @@ const csvCell = (value) => {
   if (value === null || value === undefined) return "";
   const s = String(value);
   // Quote anything that would otherwise break the row, and double inner quotes.
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  return /[",\n\r]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
 };
 
 const toCsv = (headers, rows) =>

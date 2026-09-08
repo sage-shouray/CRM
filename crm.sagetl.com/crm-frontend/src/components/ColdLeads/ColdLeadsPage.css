@@ -1,0 +1,584 @@
+.cold-leads-page {
+    padding: 18px 20px;
+    margin: 0 auto;
+    max-width: 1400px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.clp-head h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--slate-900);
+    margin: 0;
+    letter-spacing: -0.4px;
+}
+
+.clp-head h1 svg {
+    color: #38bdf8;
+}
+
+.clp-head p {
+    font-size: 13px;
+    color: var(--slate-500);
+    margin: 4px 0 0 0;
+    max-width: 720px;
+    line-height: 1.5;
+}
+
+.clp-error {
+    background: var(--danger-bg);
+    color: var(--danger-hover);
+    border: 1px solid var(--danger-border);
+    border-radius: var(--radius-xs);
+    padding: 10px 14px;
+    font-size: 13px;
+    margin: 0;
+}
+
+.clp-section {
+    background: #ffffff;
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+}
+
+.clp-section h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--slate-900);
+    margin: 0 0 14px 0;
+}
+
+.clp-section h2 svg {
+    color: var(--primary);
+    font-size: 13px;
+}
+
+.clp-empty {
+    color: var(--slate-400);
+    font-size: 13px;
+    margin: 0;
+}
+
+.clp-mine-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.clp-mine-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+    background: var(--slate-50);
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+}
+
+.clp-mine-card:hover {
+    border-color: var(--primary-border);
+    background: var(--primary-light);
+}
+
+.clp-mine-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--slate-900);
+}
+
+.clp-days-left {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--success-bg);
+    color: var(--success-hover);
+    border: 1px solid var(--success-border);
+}
+
+.clp-days-left.is-urgent {
+    background: var(--danger-bg);
+    color: var(--danger-hover);
+    border-color: var(--danger-border);
+}
+
+.clp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.clp-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--slate-500);
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--slate-200);
+}
+
+.clp-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--slate-100);
+    color: var(--slate-700);
+    vertical-align: middle;
+}
+
+.clp-company-link {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.clp-company-link:hover {
+    text-decoration: underline;
+}
+
+.clp-tenure-input {
+    width: 60px;
+    padding: 5px 8px;
+    border: 1px solid var(--slate-300);
+    border-radius: var(--radius-xs);
+    font-size: 13px;
+    text-align: center;
+}
+
+.clp-tenure-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.clp-pull-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--primary);
+    color: #ffffff;
+    border: none;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.clp-pull-btn:hover:not(:disabled) {
+    background: var(--primary-hover);
+}
+
+.clp-pull-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+@media (max-width: 700px) {
+    .clp-table {
+        display: block;
+        overflow-x: auto;
+    }
+}
+
+/* ---- Previously Yours panel ---- */
+.clp-previous {
+    border-color: var(--primary-border);
+    background: var(--primary-light);
+}
+
+.clp-previous-sub {
+    font-size: 12px;
+    color: var(--slate-500);
+    margin: -8px 0 12px 0;
+}
+
+/* ---- Filter bar ---- */
+.clp-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.clp-search-box {
+    position: relative;
+    flex: 1 1 200px;
+    min-width: 180px;
+}
+
+.clp-search-icon {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--slate-400);
+    font-size: 12px;
+}
+
+.clp-search-box input {
+    width: 100%;
+    padding: 8px 10px 8px 32px;
+    border: 1px solid var(--slate-300);
+    border-radius: var(--radius-xs);
+    font-size: 13px;
+    box-sizing: border-box;
+}
+
+.clp-filter-bar select {
+    padding: 8px 10px;
+    border: 1px solid var(--slate-300);
+    border-radius: var(--radius-xs);
+    font-size: 13px;
+    background: #ffffff;
+}
+
+.clp-filter-bar select:focus,
+.clp-search-box input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.clp-fresh-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--slate-700);
+    white-space: nowrap;
+}
+
+/* ---- Select-all row ---- */
+.clp-select-row {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 8px;
+}
+
+.clp-link-btn {
+    background: transparent;
+    border: none;
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+}
+
+.clp-link-btn:hover {
+    text-decoration: underline;
+}
+
+/* ---- History badges ---- */
+.clp-badge {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.clp-badge-new {
+    background: var(--success-bg);
+    color: var(--success-hover);
+    border: 1px solid var(--success-border);
+}
+
+.clp-badge-recycled {
+    background: var(--slate-100);
+    color: var(--slate-600);
+    border: 1px solid var(--slate-300);
+}
+
+/* ---- Action bars (previously-yours inline, and sticky for the main pool) ---- */
+.clp-action-bar,
+.clp-sticky-action-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--slate-700);
+}
+
+.clp-action-bar label,
+.clp-sticky-action-bar label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+}
+
+.clp-sticky-action-bar {
+    position: sticky;
+    bottom: 16px;
+    z-index: 5;
+    background: #ffffff;
+    border: 1px solid var(--slate-200);
+    box-shadow: var(--shadow-lg);
+    border-radius: var(--radius-md);
+    padding: 12px 18px;
+    margin-top: 0;
+}
+
+/* ---- "No note between" date-range filter ---- */
+.clp-date-filter-bar {
+    align-items: center;
+    padding-top: 4px;
+}
+
+.clp-date-filter-label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--slate-700);
+    white-space: nowrap;
+}
+
+.clp-date-filter-bar input[type="date"] {
+    padding: 7px 10px;
+    border: 1px solid var(--slate-300);
+    border-radius: var(--radius-xs);
+    font-size: 13px;
+}
+
+.clp-date-filter-bar span {
+    font-size: 12.5px;
+    color: var(--slate-500);
+}
+
+.clp-date-filter-hint {
+    font-style: italic;
+    margin-left: 6px;
+}
+
+/* ---- Pull-100 action ---- */
+.clp-pull-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 4px 0 14px 0;
+}
+
+.clp-pull-100-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--primary-gradient, var(--primary));
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius-full);
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
+    transition: all 0.15s ease;
+}
+
+.clp-pull-100-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.42);
+    transform: translateY(-1px);
+}
+
+.clp-pull-100-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* ---- Last-pulled-by column: name + a custom popover for the note ---- */
+.clp-last-puller-wrap {
+    position: relative;
+    display: inline-block;
+    outline: none;
+}
+
+.clp-last-puller {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--slate-700);
+    cursor: help;
+    border-bottom: 1px dotted var(--slate-400);
+}
+
+.clp-last-puller-none {
+    color: var(--slate-300);
+}
+
+/* A frosted glass card, not the plain browser tooltip: fixed footprint so
+   every row's popover reads the same regardless of note length, a soft
+   blurred background so it sits above the table without feeling like a
+   separate opaque box, and the note visually separated from who-said-it. */
+.clp-note-tooltip {
+    position: absolute;
+    /* "Last Pulled By" is the table's rightmost column, so the popover opens
+       leftward from that edge instead of centering — centering is what let
+       it spill past the right edge of the viewport and drag the whole page
+       into horizontal scroll. */
+    right: 0;
+    left: auto;
+    bottom: calc(100% + 10px);
+    transform: translateY(4px);
+    width: 260px;
+    max-width: min(260px, calc(100vw - 32px));
+    background: rgba(15, 23, 42, 0.82);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.28);
+    padding: 12px 14px;
+    box-sizing: border-box;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 40;
+}
+
+.clp-last-puller-wrap:hover .clp-note-tooltip,
+.clp-last-puller-wrap:focus-visible .clp-note-tooltip,
+.clp-last-puller-wrap:focus-within .clp-note-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.clp-note-tooltip-arrow {
+    position: absolute;
+    top: 100%;
+    right: 14px;
+    left: auto;
+    width: 10px;
+    height: 10px;
+    background: rgba(15, 23, 42, 0.82);
+    border-right: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+.clp-note-tooltip-text {
+    margin: 0 0 8px 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #f1f5f9;
+    font-weight: 500;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+.clp-note-tooltip-meta {
+    display: block;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.clp-note-tooltip-meta:first-child {
+    padding-top: 0;
+    border-top: none;
+}
+
+/* ---- "Fewer than 100" confirmation ---- */
+.clp-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2500;
+}
+
+.clp-confirm-modal {
+    background: #ffffff;
+    border-radius: var(--radius-md);
+    padding: 24px;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: var(--shadow-lg);
+    box-sizing: border-box;
+}
+
+.clp-confirm-modal h3 {
+    margin: 0 0 8px 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--slate-900);
+}
+
+.clp-confirm-modal p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--slate-600);
+    line-height: 1.55;
+}
+
+.clp-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.clp-confirm-cancel {
+    background: transparent;
+    border: 1px solid var(--slate-200);
+    color: var(--slate-600);
+    padding: 9px 16px;
+    border-radius: var(--radius-xs);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.clp-confirm-cancel:hover {
+    background: var(--slate-50);
+}
+
+.clp-confirm-yes {
+    background: var(--primary);
+    color: #ffffff;
+    border: none;
+    padding: 9px 18px;
+    border-radius: var(--radius-xs);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.clp-confirm-yes:hover:not(:disabled) {
+    background: var(--primary-hover);
+}
+
+.clp-confirm-yes:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}

@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import axios from "axios";
 import { API_BASE_URL } from "../config";
+import { useLiveUpdates } from "../liveUpdates";
 
 // The calendar now lives in the sidebar, outside the page tree, but the date
 // the user picks still drives the agenda on the Home page. That shared state
@@ -64,11 +65,33 @@ export function DashboardProvider({ children }) {
     return () => window.removeEventListener("tasks:changed", onTasksChanged);
   }, [load]);
 
-  // Leads and tasks flattened into the shape HomeCalendar expects.
+  // The KPI tiles, Pipeline board, and "Lead Follow-ups & Tasks" queue all
+  // read from this one shared fetch — without this, a lead someone else
+  // created or updated, or a task completed elsewhere, only showed up here
+  // after a full page reload. Any leads/tasks change anywhere in the system
+  // now refreshes this shared state directly.
+  useLiveUpdates(["leads", "tasks"], load);
+
+  // Leads and tasks flattened into the shape HomeCalendar expects. `leads`
+  // itself stays unscoped (Pipeline needs every company), but the calendar's
+  // day badges are personal — even just a count of someone else's follow-ups
+  // is still their activity, not this viewer's, so it's filtered here too.
+  const numericSelfId = Number(sessionStorage.getItem("userId"));
+  const isMyLeadForCalendar = (lead) => {
+    if (!Number.isFinite(numericSelfId)) return false;
+    const creatorId = Number(lead.createdBy?._id ?? lead.createdBy?.id ?? lead.createdBy);
+    if (creatorId === numericSelfId) return true;
+    const assigned = lead.companyInfo?.leadAssignedTo;
+    const idOf = (v) => Number(v?._id ?? v?.id ?? v);
+    return Array.isArray(assigned)
+      ? assigned.some((a) => idOf(a) === numericSelfId)
+      : idOf(assigned) === numericSelfId;
+  };
+
   const calendarEvents = useMemo(() => {
     const events = [];
 
-    (leads || []).forEach((lead) => {
+    (leads || []).filter(isMyLeadForCalendar).forEach((lead) => {
       const info = lead.companyInfo || {};
       const date =
         dateOnly(info.dateField) ||

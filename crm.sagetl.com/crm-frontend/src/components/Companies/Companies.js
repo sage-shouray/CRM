@@ -10,6 +10,7 @@ import LeadDetails from "../Leads/LeadDetails";
 import "./Companies.css";
 
 import { API_BASE_URL } from "../../config";
+import { formatDate, formatDateTime } from "../../dateFormat";
 
 // Flatten a form config into an ordered [name, label] list so this page renders
 // fields in exactly the order they appear on the Create Lead form.
@@ -92,7 +93,7 @@ const formatValue = (value, userLookup) => {
 
   // ISO timestamps stored by the date picker.
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
-    return new Date(value).toLocaleDateString();
+    return formatDate(value);
   }
   return String(value);
 };
@@ -233,7 +234,7 @@ const Companies = () => {
               </span>
               {desc.createdAt && (
                 <span className="companies-note-date">
-                  {new Date(desc.createdAt).toLocaleString()}
+                  {formatDateTime(desc.createdAt)}
                 </span>
               )}
             </header>
@@ -339,9 +340,7 @@ const Companies = () => {
                   <p>
                     Lead #{selectedLead.leadNumber}
                     {selectedLead.createdAt &&
-                      ` · Created ${new Date(
-                        selectedLead.createdAt
-                      ).toLocaleDateString()}`}
+                      ` · Created ${formatDate(selectedLead.createdAt)}`}
                     {selectedLead.createdBy?.firstName &&
                       ` by ${selectedLead.createdBy.firstName}`}
                   </p>

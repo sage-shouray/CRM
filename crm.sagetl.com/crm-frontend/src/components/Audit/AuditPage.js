@@ -9,15 +9,12 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { roleShortLabel } from "../../roles";
 import { API_BASE_URL } from "../../config";
+import { formatDateTime } from "../../dateFormat";
 import "./AuditPage.css";
 
 const PAGE_SIZE = 100;
 
-const fmtWhen = (value) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
-};
+const fmtWhen = (value) => formatDateTime(value) || "—";
 
 // The full UA string is unreadable in a table; reduce it to the browser and OS.
 const shortAgent = (ua) => {

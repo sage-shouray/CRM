@@ -17,6 +17,8 @@ import ReportsPage from "./components/Reports/ReportsPage";
 import AuditPage from "./components/Audit/AuditPage";
 import PermissionsPage from "./components/Permissions/PermissionsPage";
 import PipelinePage from "./components/Pipeline/PipelinePage";
+import ColdLeadsPage from "./components/ColdLeads/ColdLeadsPage";
+import MyColdLeadsPage from "./components/ColdLeads/MyColdLeadsPage";
 import LeadDetails from "./components/Leads/LeadDetails";
 import AdminDashboard from "./components/Admin/AdminDashboard";
 import ToDo from './components/ToDo/ToDo';
@@ -31,6 +33,8 @@ import UnassignedLeads from "./components/Supervisor/UnassignedLeads";
 import MultipleAssign from "./components/Supervisor/MultipleAssign";
 import Chat from "./components/Chat/Chat";
 import DailyLog from "./components/DailyLog/DailyLog";
+import EmailExport from "./components/EmailExport/EmailExport";
+import BulkImport from "./components/BulkImport/BulkImport";
 import { isAuthenticated as isAuthValid, getUserRole, clearSession } from "./authStorage";
 import { ROLES, ALL_ROLES } from "./roles";
 
@@ -127,6 +131,24 @@ function App() {
             }
           />
           <Route
+            path="/cold-leads"
+            element={
+              <PrivateRoute
+                element={<ColdLeadsPage />}
+                allowedRoles={ALL_ROLES}
+              />
+            }
+          />
+          <Route
+            path="/my-cold-leads"
+            element={
+              <PrivateRoute
+                element={<MyColdLeadsPage />}
+                allowedRoles={ALL_ROLES}
+              />
+            }
+          />
+          <Route
             path="/permissions"
             element={
               <PrivateRoute
@@ -140,6 +162,24 @@ function App() {
             element={
               <PrivateRoute
                 element={<AuditPage />}
+                allowedRoles={[ROLES.ADMIN]}
+              />
+            }
+          />
+          <Route
+            path="/email-export"
+            element={
+              <PrivateRoute
+                element={<EmailExport />}
+                allowedRoles={[ROLES.ADMIN]}
+              />
+            }
+          />
+          <Route
+            path="/bulk-import"
+            element={
+              <PrivateRoute
+                element={<BulkImport />}
                 allowedRoles={[ROLES.ADMIN]}
               />
             }

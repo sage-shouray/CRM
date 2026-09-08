@@ -229,8 +229,7 @@ async function queryAuditLog({
     params
   );
 
-  params.push(Math.min(Number(limit) || 100, 500));
-  params.push(Number(offset) || 0);
+  params.push(Math.min(Number(limit) || 100, 500), Number(offset) || 0);
 
   const rows = await pool.query(
     `SELECT a.id, a.user_id, a.user_label, a.action, a.method, a.path,

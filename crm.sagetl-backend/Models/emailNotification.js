@@ -3,6 +3,14 @@ const UserModel = require('./User');
 const LeadModel = require('./createLeads');
 const transporter = require('./emailService');
 
+// dd/mm/yyyy — matches the one format the whole app uses, everywhere.
+const formatDateDMY = (value) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad2 = (n) => String(n).padStart(2, '0');
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+
 // Function to check if a date is today
 const isToday = (date) => {
   const today = new Date();
@@ -27,7 +35,7 @@ const sendActionDateNotification = async (user, lead) => {
       <ul>
         <li><strong>Lead Number:</strong> ${lead.leadNumber}</li>
         <li><strong>Company:</strong> ${lead.companyInfo?.companyName || 'N/A'}</li>
-        <li><strong>Action Date:</strong> ${new Date(lead.actionDate).toLocaleDateString()}</li>
+        <li><strong>Action Date:</strong> ${formatDateDMY(lead.actionDate)}</li>
         <li><strong>Next Action:</strong> ${lead.companyInfo?.nextAction || 'No specific action noted'}</li>
       </ul>
       <p>Please take necessary action as required.</p>
@@ -72,7 +80,7 @@ const checkLeadsAndNotify = async () => {
         // Find the assigned user
         const user = lead.companyInfo?.leadAssignedTo;
         
-        if (user && user.email) {
+        if (user?.email) {
           await sendActionDateNotification(user, lead);
         }
       }

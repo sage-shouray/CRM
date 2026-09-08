@@ -14,6 +14,8 @@ import {
   faCalendarPlus,
 } from "@fortawesome/free-solid-svg-icons";
 import { isOpen, isOverdue, dealValue, formatINR } from "./pipeline";
+import { ROLES, normalizeRole } from "../../roles";
+import { formatDate, formatDayMonth } from "../../dateFormat";
 
 // The fixed chips. A fifth one is added at runtime for whichever date is
 // picked on the calendar, so the rail and this panel stay in step.
@@ -32,10 +34,7 @@ const chipDate = (isoDay) => {
   if (!isoDay) return "";
   const [y, m, d] = isoDay.split("-").map(Number);
   if (!y || !m || !d) return isoDay;
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-  });
+  return formatDayMonth(new Date(y, m - 1, d));
 };
 
 // Badge tint.
@@ -97,6 +96,45 @@ function LeadsWorkspace({
   const authHeaders = () => ({
     headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
   });
+
+  // Admin-only: view someone else's Lead Follow-ups & Tasks instead of your
+  // own. Empty string means "myself". The dropdown lists everyone; the
+  // server only actually honours the override for an Admin (see GET
+  // /api/tasks), so this can never be used to see another role's private list.
+  const isAdmin = normalizeRole(sessionStorage.getItem("userRole")) === ROLES.ADMIN;
+  const [viewUserId, setViewUserId] = useState("");
+  const [viewableUsers, setViewableUsers] = useState([]);
+  const [viewedTasks, setViewedTasks] = useState([]);
+  const [isLoadingViewedTasks, setIsLoadingViewedTasks] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    axios
+      .get(`${API_BASE_URL}/api/users`, authHeaders())
+      .then((res) => setViewableUsers(res.data || []))
+      .catch((err) => console.error("Error loading users for the view-as dropdown:", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!viewUserId) {
+      setViewedTasks([]);
+      return;
+    }
+    setIsLoadingViewedTasks(true);
+    axios
+      .get(`${API_BASE_URL}/api/tasks`, { ...authHeaders(), params: { userId: viewUserId } })
+      .then((res) => setViewedTasks(res.data || []))
+      .catch((err) => {
+        console.error("Error loading that user's tasks:", err);
+        setViewedTasks([]);
+      })
+      .finally(() => setIsLoadingViewedTasks(false));
+  }, [viewUserId]);
+
+  // What's actually shown below — the selected person's tasks once one is
+  // picked, otherwise the signed-in user's own (already scoped server-side).
+  const effectiveTasks = viewUserId ? viewedTasks : tasks;
 
   const done = () => {
     setPostponeKey(null);
@@ -184,8 +222,25 @@ function LeadsWorkspace({
     setPostponeDate(currentDate || todayDate);
   };
 
+  // `leads` (from DashboardContext) is every company in the system — needed
+  // for the Pipeline board, but a next action on someone else's lead is not
+  // this person's work. This queue is "what do I do now" (see below), so it
+  // only ever shows leads the *viewed* person (selected user, or self when
+  // nobody is selected) created or is assigned to.
+  const numericUserId = Number(viewUserId || sessionStorage.getItem("userId"));
+  const isMyLead = (lead) => {
+    if (!Number.isFinite(numericUserId)) return false;
+    const creatorId = Number(lead.createdBy?._id ?? lead.createdBy?.id ?? lead.createdBy);
+    if (creatorId === numericUserId) return true;
+    const assigned = lead.companyInfo?.leadAssignedTo;
+    const idOf = (v) => Number(v?._id ?? v?.id ?? v);
+    return Array.isArray(assigned)
+      ? assigned.some((a) => idOf(a) === numericUserId)
+      : idOf(assigned) === numericUserId;
+  };
+
   const items = useMemo(() => {
-    const leadItems = leads.filter(isOpen).map((lead) => ({
+    const leadItems = leads.filter(isOpen).filter(isMyLead).map((lead) => ({
       kind: "lead",
       key: `lead-${lead.leadNumber}`,
       date: dayOf(lead.companyInfo?.dateField),
@@ -194,7 +249,7 @@ function LeadsWorkspace({
     }));
 
     // A task counts as outstanding until it is marked done.
-    const taskItems = (tasks || [])
+    const taskItems = (effectiveTasks || [])
       .filter((t) => (t.status || "pending") !== "done")
       .map((task) => {
         const date = dayOf(task.dueDate);
@@ -213,7 +268,8 @@ function LeadsWorkspace({
       if (!b.date) return -1;
       return a.date.localeCompare(b.date);
     });
-  }, [leads, tasks, todayDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads, effectiveTasks, todayDate, numericUserId]);
 
   const matches = (item, key) => {
     switch (key) {
@@ -252,6 +308,29 @@ function LeadsWorkspace({
         <h2>Lead Follow-ups &amp; Tasks</h2>
         <span className="wd-panel-count">{filtered.length}</span>
       </header>
+
+      {/* Admin only: switch this whole panel to someone else's follow-ups and
+          tasks instead of your own. The server still refuses this override
+          for anyone who isn't an Admin, whatever the client sends. */}
+      {isAdmin && (
+        <div className="wd-view-as">
+          <label htmlFor="wd-view-as-select">Viewing:</label>
+          <select
+            id="wd-view-as-select"
+            value={viewUserId}
+            onChange={(e) => setViewUserId(e.target.value)}
+          >
+            <option value="">Myself</option>
+            {viewableUsers.map((u) => (
+              <option key={u._id || u.id} value={u._id || u.id}>
+                {u.firstName} {u.lastName}
+                {u.designation ? ` — ${u.designation}` : ""}
+              </option>
+            ))}
+          </select>
+          {isLoadingViewedTasks && <span className="wd-view-as-loading">Loading…</span>}
+        </div>
+      )}
 
       <div className="wd-filters">
         <span className="wd-filters-label">Filter by:</span>
@@ -337,7 +416,7 @@ function LeadsWorkspace({
                       <span className={item.overdue ? "is-alert" : ""}>
                         <FontAwesomeIcon icon={faClock} />{" "}
                         {item.overdue ? "Overdue " : "Due "}
-                        {new Date(item.date).toLocaleDateString()}
+                        {formatDate(item.date)}
                       </span>
                     )}
                     {task.status && task.status !== "pending" && (
@@ -345,25 +424,30 @@ function LeadsWorkspace({
                     )}
                   </div>
 
-                  <div className="wd-lead-actions">
-                    <button
-                      type="button"
-                      className="wd-lead-btn is-done"
-                      disabled={busyKey === item.key}
-                      onClick={() => markTaskDone(task, item.key)}
-                    >
-                      <FontAwesomeIcon icon={faCheck} /> Done
-                    </button>
-                    <button
-                      type="button"
-                      className="wd-lead-btn"
-                      onClick={() => openPostpone(item.key, item.date)}
-                    >
-                      <FontAwesomeIcon icon={faCalendarPlus} /> Postpone
-                    </button>
-                  </div>
+                  {/* Viewing someone else's tasks is read-only — the server
+                      only lets a task's own owner or assigner change it, so
+                      an Admin just looking in on this list can't act on it. */}
+                  {!viewUserId && (
+                    <div className="wd-lead-actions">
+                      <button
+                        type="button"
+                        className="wd-lead-btn is-done"
+                        disabled={busyKey === item.key}
+                        onClick={() => markTaskDone(task, item.key)}
+                      >
+                        <FontAwesomeIcon icon={faCheck} /> Done
+                      </button>
+                      <button
+                        type="button"
+                        className="wd-lead-btn"
+                        onClick={() => openPostpone(item.key, item.date)}
+                      >
+                        <FontAwesomeIcon icon={faCalendarPlus} /> Postpone
+                      </button>
+                    </div>
+                  )}
 
-                  {postponeKey === item.key && (
+                  {!viewUserId && postponeKey === item.key && (
                     <div className="wd-postpone">
                       <input
                         type="date"
@@ -437,7 +521,7 @@ function LeadsWorkspace({
                   {info.dateField && (
                     <span className={overdue ? "is-alert" : ""}>
                       {overdue ? "Overdue " : "Due "}
-                      {new Date(info.dateField).toLocaleDateString()}
+                      {formatDate(info.dateField)}
                     </span>
                   )}
                   {info.state && (
@@ -517,6 +601,19 @@ function LeadsWorkspace({
               </article>
             );
           })}
+
+        {/* A short list left the rest of the panel blank white — this turns
+            that leftover space into an intentional "you're done here"
+            message instead of looking like the panel cut off early. */}
+        {!isLoading && filtered.length > 0 && filtered.length <= 6 && (
+          <div className="wd-list-tail">
+            <FontAwesomeIcon icon={faCheck} className="wd-list-tail-icon" />
+            <p>
+              That's everything for{" "}
+              {FILTERS.find((f) => f.key === filter)?.label.toLowerCase() || "this filter"}.
+            </p>
+          </div>
+        )}
       </div>
     </section>
   );

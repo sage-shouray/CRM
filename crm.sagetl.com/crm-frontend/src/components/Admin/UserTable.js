@@ -241,6 +241,7 @@ const UserTable = () => {
         {error && <p className="user-table-error">{error}</p>}
         {notice && <p className="user-table-notice">{notice}</p>}
 
+        <div className="table-scroll-wrapper">
         <table className="user-table">
           <thead>
             <tr>
@@ -301,6 +302,7 @@ const UserTable = () => {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {showEditModal && selectedUserId && (

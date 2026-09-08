@@ -5,19 +5,9 @@ const nodemailer = require('nodemailer');
 const transporter = require("../Models/emailService");
 const { ROLES, normalizeRole } = require("../Middleware/roles");
 
-// Same allow-list index.js uses for CORS: an explicit CORS_ORIGINS list, plus
-// (unless disabled) any private-network address, since the LAN address DHCP
-// hands out moves on its own.
-const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:3000")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
-const PRIVATE_ORIGIN = /^https?:\/\/(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
-const allowLanOrigins = (process.env.ALLOW_LAN_ORIGINS || "true").trim() !== "false";
-
-const isTrustedOrigin = (origin) =>
-  !!origin &&
-  (allowedOrigins.includes(origin) || (allowLanOrigins && PRIVATE_ORIGIN.test(origin)));
+// Same allow-list index.js uses for CORS — one shared copy now (see
+// Middleware/corsOrigins.js) instead of a second one drifting apart here.
+const { isTrustedOrigin } = require("../Middleware/corsOrigins");
 
 // Where the reset link should point. The app's own address, not the API's.
 //
@@ -117,7 +107,7 @@ const forgotPassword = async (req, res) => {
         )} rejected=${JSON.stringify(info.rejected)} response=${info.response}`
       );
 
-      if (info.rejected && info.rejected.length > 0) {
+      if (info.rejected?.length > 0) {
         return res.status(502).json({
           success: false,
           message: `The mail server rejected ${email}. Check the address exists.`,
@@ -197,7 +187,7 @@ const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     // Always act on the authenticated user, never a client-supplied id.
-    const userId = req.user && req.user.id;
+    const userId = req.user?.id;
 
     if (!userId || !newPassword) {
       return res

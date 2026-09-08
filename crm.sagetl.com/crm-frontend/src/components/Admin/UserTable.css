@@ -412,3 +412,22 @@
   line-height: 1.45;
   color: var(--slate-500);
 }
+
+/* The user directory has too many columns to shrink onto a phone screen —
+   it scrolls inside its own box instead of forcing the page to scroll
+   sideways. */
+.table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.user-table {
+  min-width: 700px;
+}
+
+@media (max-width: 480px) {
+  .table-container {
+    padding: 0;
+  }
+}

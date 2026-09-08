@@ -29,6 +29,8 @@ import "./HomeToDoWidget.css";
 
 import { API_BASE_URL } from "../../config";
 import { useLiveUpdates } from "../../liveUpdates";
+import { formatDate } from "../../dateFormat";
+import { ROLES, normalizeRole } from "../../roles";
 
 // addOnly renders just the "Add Task" button and its modal — used by the right
 // rail, where the agenda and task lists were removed and created tasks surface
@@ -36,15 +38,39 @@ import { useLiveUpdates } from "../../liveUpdates";
 function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = [], isLoadingLeads, onOpenLead, addOnly = false, onTaskCreated }) {
   const userId = sessionStorage.getItem("userId") || "default";
   const todayStr = new Date().toISOString().split("T")[0];
+  const isAdmin = normalizeRole(sessionStorage.getItem("userRole")) === ROLES.ADMIN;
 
   const [tasks, setTasks] = useState([]);
+
+  // Admin-only: view another person's Lead Follow-ups & Tasks instead of your
+  // own. Empty string means "myself" throughout.
+  const [viewUserId, setViewUserId] = useState("");
+  const [viewableUsers, setViewableUsers] = useState([]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const token = sessionStorage.getItem("token");
+    if (!token) return;
+    axios
+      .get(`${API_BASE_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => setViewableUsers(res.data || []))
+      .catch((err) => console.error("Error loading users for the view-as dropdown:", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
+
+  // Whoever's work is actually being shown right now — the selected person
+  // for an Admin who has picked one, otherwise the signed-in user.
+  const effectiveUserId = viewUserId || userId;
 
   const fetchTasksFromDB = async () => {
     try {
       const token = sessionStorage.getItem("token");
       if (!token) return;
       const res = await axios.get(`${API_BASE_URL}/api/tasks`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        // Only ever honoured server-side for an Admin; everyone else's
+        // request is unaffected by this and still returns just their own.
+        params: viewUserId ? { userId: viewUserId } : {},
       });
       const formatted = (res.data || []).map(t => {
         if (t.dueDate < todayStr && t.status !== "done" && t.status !== "postponed") {
@@ -60,7 +86,8 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
 
   useEffect(() => {
     fetchTasksFromDB();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewUserId]);
 
   // A task assigned to you by someone else, or a lead created elsewhere,
   // appears here immediately rather than on the next page reload.
@@ -126,18 +153,34 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
   // Determine which selected date and followups to use
   const effectiveSelectedDate = selectedDate || internalSelectedDate;
   
+  // GET /api/leads deliberately returns every company in the system (so the
+  // main Leads table can show them all) — but a next action set on someone
+  // else's lead is not this person's work to do, so the agenda has to filter
+  // down to leads this user created or is assigned to before matching dates.
+  const numericUserId = Number(userId);
+  const isMyLead = (lead) => {
+    if (!Number.isFinite(numericUserId)) return false;
+    const creatorId = Number(lead.createdBy?._id ?? lead.createdBy?.id ?? lead.createdBy);
+    if (creatorId === numericUserId) return true;
+    const assigned = lead.companyInfo?.leadAssignedTo;
+    const idOf = (v) => Number(v?._id ?? v?.id ?? v);
+    return Array.isArray(assigned)
+      ? assigned.some((a) => idOf(a) === numericUserId)
+      : idOf(assigned) === numericUserId;
+  };
+
   // Calculate followups internally if not provided by prop
   const effectiveFollowups = useMemo(() => {
     if (selectedDateFollowups && selectedDateFollowups.length > 0) {
       return selectedDateFollowups;
     }
     const followups = [];
-    systemLeads.forEach((lead) => {
-      const actionDate = lead.companyInfo?.dateField 
+    systemLeads.filter(isMyLead).forEach((lead) => {
+      const actionDate = lead.companyInfo?.dateField
         ? lead.companyInfo.dateField.split("T")[0]
-        : lead.companyInfo?.nextActionDate 
+        : lead.companyInfo?.nextActionDate
         ? lead.companyInfo.nextActionDate.split("T")[0]
-        : lead.createdAt 
+        : lead.createdAt
         ? lead.createdAt.split("T")[0]
         : null;
 
@@ -796,7 +839,7 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
                           )}
 
                           {isOverdueNotDone && !isDone && (
-                            <span className="status-pill pill-overdue" title={`Original due date was ${task.originalDueDate || task.dueDate}`}>
+                            <span className="status-pill pill-overdue" title={`Original due date was ${formatDate(task.originalDueDate || task.dueDate)}`}>
                               <FontAwesomeIcon icon={faHistory} /> Carried Forward
                             </span>
                           )}
@@ -807,7 +850,7 @@ function HomeToDoWidget({ onTaskUpdate, selectedDate, selectedDateFollowups = []
                           </span>
                           <span className="category-tag">{task.category || "General"}</span>
                           <span className="due-date-tag">
-                            <FontAwesomeIcon icon={faCalendarDay} className="cal-icon" /> {task.dueDate}
+                            <FontAwesomeIcon icon={faCalendarDay} className="cal-icon" /> {formatDate(task.dueDate)}
                           </span>
                         </div>
                       </div>

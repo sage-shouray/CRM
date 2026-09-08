@@ -2,20 +2,18 @@ import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faList, faLayerGroup } from "@fortawesome/free-solid-svg-icons";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import "./Home.css";
 import useAuthGuard from "./useAuthGuard";
 import { ROLES, normalizeRole, roleLabel, canManageTeam } from "../../roles";
 import LeadsWorkspace from "./LeadsWorkspace";
 import TodaysWorkWidget from "./TodaysWorkWidget";
+import PeopleSearch from "./PeopleSearch";
 // The pipeline funnel lives on its own page (/pipeline); the dashboard keeps
 // only the headline figures from it.
 import { buildPipeline } from "./pipeline";
 import { useDashboard, todayStr } from "../../context/DashboardContext";
 import LeadDetails from "../Leads/LeadDetails";
-
-import { API_BASE_URL } from "../../config";
-import { useLiveUpdates } from "../../liveUpdates";
+import { formatLongDate } from "../../dateFormat";
 
 function Home() {
   useAuthGuard();
@@ -24,20 +22,14 @@ function Home() {
 
   const [userRole, setUserRole] = useState("");
   const [userName, setUserName] = useState("");
-
-  const [leads, setLeads] = useState([]);
-  const [isLoadingLeads, setIsLoadingLeads] = useState(true);
   const [selectedLeadNumber, setSelectedLeadNumber] = useState(null);
 
-  // Tasks are owned by the shared dashboard context, so a task created from the
-  // rail shows up here as soon as the context refreshes.
-  const { tasks, refresh, selectedDate } = useDashboard();
-
-  // Completing or postponing from a card touches both leads and tasks.
-  const refreshAll = () => {
-    fetchDashboardLeads();
-    refresh();
-  };
+  // Leads and tasks both come from the one shared dashboard fetch — this
+  // page used to run its own separate GET /api/leads on top of the context's,
+  // doubling the heaviest query in the app (every lead, fully populated) on
+  // every single Home visit for no benefit, since both copies held identical
+  // data. One fetch, shared, is all this page needs.
+  const { leads, tasks, isLoading: isLoadingLeads, refresh, selectedDate } = useDashboard();
 
   useEffect(() => {
     const role = normalizeRole(sessionStorage.getItem("userRole")) || ROLES.EXECUTIVE;
@@ -45,29 +37,7 @@ function Home() {
 
     setUserRole(role);
     setUserName(name);
-
-    fetchDashboardLeads();
   }, []);
-
-  // Leads or tasks changing anywhere refresh the dashboard in place.
-  useLiveUpdates(["leads", "tasks"], () => fetchDashboardLeads());
-
-  const fetchDashboardLeads = async () => {
-    setIsLoadingLeads(true);
-    try {
-      const token = sessionStorage.getItem("token");
-      if (!token) return;
-
-      const response = await axios.get(`${API_BASE_URL}/api/leads`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setLeads(response.data || []);
-    } catch (err) {
-      console.error("Error fetching leads for home dashboard:", err);
-    } finally {
-      setIsLoadingLeads(false);
-    }
-  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -81,10 +51,13 @@ function Home() {
 
   const todayDate = todayStr();
   const pipeline = buildPipeline(leads);
-  const userCity = leads.find((l) => l.companyInfo?.city)?.companyInfo?.city || "";
-  const longDate = new Date().toLocaleDateString(undefined, {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
+  // The office location shown in the greeting — not derived from lead data.
+  // It used to be whichever lead happened to be first in the list that had a
+  // city set, which had nothing to do with the signed-in user or the
+  // company; it just showed a different, effectively random city depending
+  // on data order.
+  const userCity = "Noida";
+  const longDate = formatLongDate();
 
   const handleOpenLead = (leadNum) => {
     if (leadNum) {
@@ -94,7 +67,7 @@ function Home() {
 
   const handleCloseLeadDetails = () => {
     setSelectedLeadNumber(null);
-    fetchDashboardLeads();
+    refresh();
   };
 
   return (
@@ -112,6 +85,13 @@ function Home() {
             {[userCity, longDate].filter(Boolean).join(" | ")}
           </p>
         </div>
+
+        {/* Find a lead by the contact person's name instead of the company —
+            useful when the person is remembered but which account they sit
+            under isn't. Lives in the header row (not its own row below) so
+            it costs no extra vertical space on a layout that otherwise fits
+            in one screen with no page scroll. */}
+        <PeopleSearch />
 
         <div className="header-action-group">
           <button onClick={() => navigate("/create-lead")} className="dash-header-btn btn-primary-action">
@@ -159,7 +139,7 @@ function Home() {
           selectedDate={selectedDate}
           isLoading={isLoadingLeads}
           onOpenLead={handleOpenLead}
-          onRefresh={refreshAll}
+          onRefresh={refresh}
         />
       </div>
 

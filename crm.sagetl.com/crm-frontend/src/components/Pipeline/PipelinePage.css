@@ -265,3 +265,118 @@
     max-height: none;
   }
 }
+
+/* ---- Hot Pipeline Value by BDM ----
+   A single tile for a BDM (their own number only); a small ranked list for
+   Admin/Manager tiers, showing every BDM's Hot-lead deal value side by side. */
+.hot-pipeline-widget {
+  background: #ffffff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+}
+
+.hpw-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #fff1eb;
+  color: #ea580c;
+  font-size: 17px;
+}
+
+.hpw-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--slate-500);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 2px;
+}
+
+.hpw-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--slate-900);
+  letter-spacing: -0.3px;
+}
+
+.hot-pipeline-self {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hot-pipeline-admin .hpw-admin-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.hpw-empty {
+  font-size: 13px;
+  color: var(--slate-400);
+  margin: 0;
+}
+
+.hpw-bdm-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hpw-bdm-list li {
+  display: grid;
+  grid-template-columns: 110px 1fr 120px;
+  align-items: center;
+  gap: 12px;
+}
+
+.hpw-bdm-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-700);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hpw-bdm-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--slate-100);
+  overflow: hidden;
+}
+
+.hpw-bdm-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #fb923c, #ea580c);
+}
+
+.hpw-bdm-value {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--slate-900);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .hpw-bdm-list li {
+    grid-template-columns: 90px 1fr 90px;
+  }
+}

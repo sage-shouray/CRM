@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import ReactDOM from "react-dom";
 import { ROLES, normalizeRole } from "../../roles";
 import axios from "axios";
 import { Country, State, City } from "country-state-city";
@@ -10,6 +11,7 @@ import {
 } from "./formConfigs";
 
 import { API_BASE_URL } from "../../config";
+import { formatDate } from "../../dateFormat";
 
 // Which IT Landscape block belongs to a given lead type. Lead types with no
 // block of their own (PSU's) show none. Rendering and validation both read
@@ -22,6 +24,47 @@ export const isLandscapeSectionVisible = (section, leadType) => {
 };
 
 const FormRow = ({ children }) => <div className="form-row">{children}</div>;
+
+// Centered pass/fail popup for form submission. Rendered via a portal to
+// document.body so it centers correctly on pages the app applies a CSS
+// zoom/scale to (a plain `position: fixed` inside a zoomed ancestor centers
+// relative to the ancestor's scaled box, not the real viewport).
+const LeadSubmitNotice = ({ notice, onClose }) => {
+  if (!notice) return null;
+  const isSuccess = notice.type === "success";
+  return ReactDOM.createPortal(
+    <div className="lead-notice-overlay" onClick={onClose}>
+      <div
+        className={`lead-notice-box ${isSuccess ? "is-success" : "is-error"}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="lead-notice-icon">{isSuccess ? "✔" : "✕"}</div>
+        {isSuccess ? (
+          <>
+            <h2>Lead Registered Successfully</h2>
+            <p className="lead-notice-number">
+              Lead Number: <strong>{notice.leadNumber}</strong>
+            </p>
+          </>
+        ) : (
+          <>
+            <h2>Lead Not Recorded</h2>
+            <p className="lead-notice-subtext">Please fix the following before submitting:</p>
+            <ul className="lead-notice-list">
+              {notice.messages.map((msg) => (
+                <li key={msg}>{msg}</li>
+              ))}
+            </ul>
+          </>
+        )}
+        <button type="button" className="lead-notice-close-btn" onClick={onClose}>
+          OK
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+};
 
 // Company Name with type-ahead. Suggests companies already on file as the user
 // types, and reports an exact (case/space-insensitive) hit to the parent so the
@@ -381,16 +424,27 @@ const FormGroup = ({
               ))}
             </select>
             {field.datePicker && (
-              <input
-                type="date"
-                name={field.datePicker.name}
-                value={formData[field.datePicker.name] || ""}
-                onChange={handleChange}
-                onClick={(e) => e.target.showPicker?.()}
-                disabled={isDisabled}
-                className={errors[field.datePicker.name] ? "mandatory" : ""}
-                title="Click to select date from calendar"
-              />
+              <span className="date-with-readout">
+                <input
+                  type="date"
+                  name={field.datePicker.name}
+                  value={formData[field.datePicker.name] || ""}
+                  onChange={handleChange}
+                  onClick={(e) => e.target.showPicker?.()}
+                  disabled={isDisabled}
+                  className={`date-input-masked ${errors[field.datePicker.name] ? "mandatory" : ""}`}
+                  title="Click to select date from calendar"
+                />
+                {/* The native input's own mm/dd/yyyy text is hidden via CSS
+                    (date-input-masked) — this dd/mm/yyyy readout is what's
+                    actually shown, sitting on top of it. Clicks pass through
+                    (pointer-events: none) to the real input underneath. */}
+                <span className="date-overlay-text">
+                  {formData[field.datePicker.name]
+                    ? formatDate(formData[field.datePicker.name])
+                    : "dd/mm/yyyy"}
+                </span>
+              </span>
             )}
           </div>
           {field.name === "vertical" && 
@@ -413,17 +467,22 @@ const FormGroup = ({
           )}
         </>
       ) : field.type === "date" ? (
-        <input
-          type="date"
-          id={field.name}
-          name={field.name}
-          value={formData[field.name] || ""}
-          onChange={handleChange}
-          onClick={(e) => e.target.showPicker?.()}
-          disabled={isDisabled}
-          className={errors[field.name] ? "mandatory" : ""}
-          title="Click to select date from calendar"
-        />
+        <span className="date-with-readout">
+          <input
+            type="date"
+            id={field.name}
+            name={field.name}
+            value={formData[field.name] || ""}
+            onChange={handleChange}
+            onClick={(e) => e.target.showPicker?.()}
+            disabled={isDisabled}
+            className={`date-input-masked ${errors[field.name] ? "mandatory" : ""}`}
+            title="Click to select date from calendar"
+          />
+          <span className="date-overlay-text">
+            {formData[field.name] ? formatDate(formData[field.name]) : "dd/mm/yyyy"}
+          </span>
+        </span>
       ) : (
         <input
           type={field.type}
@@ -460,6 +519,9 @@ const CreateLeads = () => {
     createdBy: "",
   });
   const [errors, setErrors] = useState({});
+  // Centered popup shown after a submit attempt — either the assigned lead
+  // number on success, or the list of reasons the lead couldn't be saved.
+  const [notice, setNotice] = useState(null);
   // Set when the typed company name exactly matches one already on file.
   const [duplicateCompany, setDuplicateCompany] = useState(null);
   const handleDuplicateChange = useCallback(
@@ -507,15 +569,16 @@ const CreateLeads = () => {
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const [optionsResponse, userNamesResponse] = await Promise.all([
+        const [optionsResponse, userNamesResponse, bdmResponse] = await Promise.all([
           axios.get(`${API_BASE_URL}/api/options`),
           axios.get(`${API_BASE_URL}/api/users`),
+          // Every Manager's name, unscoped by the caller's own place in the
+          // reporting tree — an Executive's own BDM sits above them and would
+          // never show up through the hierarchy-scoped /api/users call.
+          axios.get(`${API_BASE_URL}/api/bdms`),
         ]);
         const allUsers = userNamesResponse.data || [];
-        const bdmNames = allUsers
-          // BDM is a role now, not a free-text designation.
-          .filter((user) => normalizeRole(user.role) === ROLES.MANAGER)
-          .map(user => user.firstName);
+        const bdmNames = bdmResponse.data || [];
         const allUserNames = allUsers.map(user => user.firstName);
         setOptions((prevOptions) => ({
           ...prevOptions,
@@ -634,7 +697,10 @@ const CreateLeads = () => {
       ...prevData,
       additionalSections: [
         ...prevData.additionalSections,
-        { sectionTitle: `Other Contact Person ${prevData.additionalSections.length + 1}` },
+        // Category defaults to IT since that's the most common case; the
+        // user can change it. No separate role-title field — the category
+        // itself identifies what this contact is.
+        { category: "IT" },
       ],
     }));
   }, []);
@@ -646,12 +712,12 @@ const CreateLeads = () => {
     }));
   }, []);
 
-  const handleSectionTitleChange = useCallback((indexToUpdate, newTitle) => {
+  const handleSectionCategoryChange = useCallback((indexToUpdate, newCategory) => {
     setFormData((prevData) => {
       const updated = [...prevData.additionalSections];
       updated[indexToUpdate] = {
         ...updated[indexToUpdate],
-        sectionTitle: newTitle,
+        category: newCategory,
       };
       return { ...prevData, additionalSections: updated };
     });
@@ -750,13 +816,21 @@ const CreateLeads = () => {
     if (!formData.description.trim())
       newErrors.description = "Description is required";
     // An attachment is optional — a lead can be created without one.
-    if (!formData.selectedOption)
-      newErrors.selectedOption = "Present Conversation Level is required";
     if (!formData.radioValue)
       newErrors.radioValue = "Mailer Shared selection is required";
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const isValid = Object.keys(newErrors).length === 0;
+    if (!isValid) {
+      // "Required if no other contact is filled" just restates
+      // contactRequired's own message when both are present — skip the
+      // duplicate so the popup doesn't say the same thing twice.
+      const messages = Object.entries(newErrors)
+        .filter(([key]) => !(key === "itName" && newErrors.contactRequired))
+        .map(([, value]) => value);
+      setNotice({ type: "error", messages: Array.from(new Set(messages)) });
+    }
+    return isValid;
   }, [formData, file, duplicateCompany]);
 
   const handleSubmit = async (e) => {
@@ -764,8 +838,15 @@ const CreateLeads = () => {
     if (validateForm()) {
       try {
         const formDataToSend = new FormData();
+        // An "Other Contact" section with no person name isn't a contact —
+        // it's just a leftover blank block. Drop those before sending so an
+        // empty section never gets saved as a real additional contact.
+        const usableAdditionalSections = (formData.additionalSections || []).filter(
+          (section) => Boolean(section?.name && section.name.toString().trim())
+        );
         const dataToSend = {
           ...formData,
+          additionalSections: usableAdditionalSections,
           createdBy: userId || null,
           company: {
             ...formData.company,
@@ -787,9 +868,7 @@ const CreateLeads = () => {
           }
         );
 
-        alert(
-          `Lead created successfully! Lead Number: ${response.data.leadNumber}`
-        );
+        setNotice({ type: "success", leadNumber: response.data.leadNumber });
         resetForm();
       } catch (error) {
         console.error("Error saving data", error);
@@ -803,15 +882,20 @@ const CreateLeads = () => {
               leadNumber: dup.leadNumber,
             });
           }
+          const dupMessage =
+            error.response.data?.error ||
+            "This company already exists. Company name must be unique.";
           setErrors((prev) => ({
             ...prev,
-            companyName:
-              error.response.data?.error ||
-              "This company already exists. Company name must be unique.",
+            companyName: dupMessage,
           }));
+          setNotice({ type: "error", messages: [dupMessage] });
           return;
         }
-        alert("Error saving data. Please try again.");
+        setNotice({
+          type: "error",
+          messages: ["Error saving data. Please try again."],
+        });
       }
     }
   };
@@ -827,8 +911,14 @@ const CreateLeads = () => {
 
           {companyFormConfig.map((row, rowIndex) => (
             <FormRow key={rowIndex}>
-              {row.map((field) =>
-                field.isPrimary ? (
+              {row.map((field) => {
+                if (
+                  field.showIf &&
+                  formData.company?.[field.showIf.field] !== field.showIf.equals
+                ) {
+                  return null;
+                }
+                return field.isPrimary ? (
                   <CompanyNameField
                     key={field.name}
                     field={field}
@@ -852,8 +942,8 @@ const CreateLeads = () => {
                   onStateSelect={handleStateSelect}
                   onCitySelect={handleCitySelect}
                 />
-                )
-              )}
+                );
+              })}
             </FormRow>
           ))}
         </section>
@@ -902,15 +992,17 @@ const CreateLeads = () => {
             <div key={`other-section-${index}`} className="contact-role-block editable-contact-block">
               <div className="section-header-action-row">
                 <div className="section-title-edit-box">
-                  <label htmlFor={`section-title-${index}`}>Contact Person Role Title:</label>
-                  <input
-                    type="text"
-                    id={`section-title-${index}`}
+                  <label htmlFor={`section-category-${index}`}>Category:</label>
+                  <select
+                    id={`section-category-${index}`}
                     className="editable-section-title-input"
-                    value={section.sectionTitle || `Other Contact Section ${index + 1}`}
-                    onChange={(e) => handleSectionTitleChange(index, e.target.value)}
-                    placeholder="e.g. Procurement Head, CTO, Operations..."
-                  />
+                    value={section.category || "IT"}
+                    onChange={(e) => handleSectionCategoryChange(index, e.target.value)}
+                  >
+                    <option value="IT">IT</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Business Head">Business Head</option>
+                  </select>
                 </div>
                 <button
                   type="button"
@@ -1187,16 +1279,15 @@ const CreateLeads = () => {
                 </div>
                 <div className="form-group">
                   <label htmlFor="supportPartner">Support Partner:</label>
-                  <select
+                  <input
+                    type="text"
                     name="supportPartner"
                     id="supportPartner"
+                    placeholder="Enter support partner"
                     value={formData.itLandscape.SAPInstalledBase?.supportPartner || ""}
                     onChange={(e) => handleChange(e, "itLandscape", "SAPInstalledBase")}
                     className={errors.supportPartner ? "mandatory" : ""}
-                  >
-                    <option value="" disabled>Select</option>
-                    {options.partnerOptions?.map((o, i) => <option key={i} value={o}>{o}</option>)}
-                  </select>
+                  />
                 </div>
               </FormRow>
 
@@ -1347,28 +1438,6 @@ const CreateLeads = () => {
                 ref={fileInputRef}
               />
             </div>
-
-            <div className="form-group">
-              <label htmlFor="selectedOption">
-                Present Conversation Level: <span className="req-star">*</span>
-              </label>
-              <select
-                id="selectedOption"
-                name="selectedOption"
-                value={formData.selectedOption}
-                onChange={(e) => handleChange(e)}
-              >
-                <option value="">Select an option</option>
-                {options.conversationLevelOptions?.map((option, index) => (
-                  <option key={index} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              {errors.selectedOption && (
-                <span className="error">{errors.selectedOption}</span>
-              )}
-            </div>
           </div>
 
           <div className="form-row">
@@ -1410,6 +1479,8 @@ const CreateLeads = () => {
           </div>
         </section>
       </form>
+
+      <LeadSubmitNotice notice={notice} onClose={() => setNotice(null)} />
     </div>
   );
 };

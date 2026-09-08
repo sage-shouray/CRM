@@ -101,6 +101,12 @@ html, body, #root, .App {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  /* Explicit, not left to default: with only overflow-y set, overflow-x
+     resolves to auto too, so anything that overflows horizontally anywhere
+     on the page (a wide tooltip, a stray fixed-width element) would scroll
+     the whole app sideways instead of just clipping. Wide content should
+     scroll inside its own container, never the page shell. */
+  overflow-x: hidden;
 }
 
 /* Below the sidebar breakpoint the rail stacks above the content, so the
@@ -109,10 +115,12 @@ html, body, #root, .App {
   .app-body {
     flex-direction: column;
     overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .app-content {
     overflow-y: visible;
+    overflow-x: hidden;
   }
 }
 

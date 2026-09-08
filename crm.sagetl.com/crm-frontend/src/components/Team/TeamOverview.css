@@ -114,3 +114,15 @@
   font-weight: 700;
   border-radius: 8px;
 }
+
+.table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 480px) {
+  .user-table {
+    min-width: 480px;
+  }
+}

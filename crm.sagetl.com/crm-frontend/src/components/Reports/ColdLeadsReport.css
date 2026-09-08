@@ -1,0 +1,58 @@
+.clr-last-company {
+  color: var(--slate-500);
+  font-weight: 500;
+}
+
+.clr-detail {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1.5px solid var(--slate-200);
+}
+
+.clr-detail h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--slate-800);
+}
+
+.clr-note-cell {
+  max-width: 320px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--slate-600);
+  font-size: 12.5px;
+}
+
+.clr-state {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.clr-state.is-hot {
+  background: var(--danger-bg);
+  color: var(--danger-hover);
+  border: 1px solid var(--danger-border);
+}
+
+.clr-state.is-warm {
+  background: var(--warning-bg);
+  color: var(--warning-hover);
+  border: 1px solid var(--warning-border);
+}
+
+.clr-state.is-returnedCold {
+  background: var(--info-bg);
+  color: var(--info-hover);
+  border: 1px solid var(--info-border);
+}
+
+.clr-state.is-pendingNoNote {
+  background: var(--slate-100);
+  color: var(--slate-600);
+  border: 1px solid var(--slate-300);
+}

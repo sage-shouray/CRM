@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import { ROLES, normalizeRole } from "../../roles";
 import axios from "axios";
 import {
@@ -9,6 +10,7 @@ import {
 import "./LeadDetails.css";
 
 import { API_BASE_URL } from "../../config";
+import { formatDateTime } from "../../dateFormat";
 
 // Must stay in step with the Lead Type list on the Create Lead form, otherwise
 // a lead saved with a type missing here opens with an empty dropdown and loses
@@ -60,15 +62,16 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate, startInEditMode = false })
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const [optionsResponse, userNamesResponse] = await Promise.all([
+        const [optionsResponse, userNamesResponse, bdmResponse] = await Promise.all([
           axios.get(`${API_BASE_URL}/api/options`),
           axios.get(`${API_BASE_URL}/api/users`),
+          // Unscoped by the caller's own place in the reporting tree — an
+          // Executive's own BDM sits above them and would never show up
+          // through the hierarchy-scoped /api/users call.
+          axios.get(`${API_BASE_URL}/api/bdms`),
         ]);
         const allUsers = userNamesResponse.data || [];
-        const bdmNames = allUsers
-          // BDM is a role now, not a free-text designation.
-          .filter((user) => normalizeRole(user.role) === ROLES.MANAGER)
-          .map(user => user.firstName);
+        const bdmNames = bdmResponse.data || [];
         setOptions((prevOptions) => ({
           ...prevOptions,
           ...optionsResponse.data,
@@ -193,7 +196,7 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate, startInEditMode = false })
   // Loading and fatal-error states still render inside the modal shell, so the
   // user always has a way back out of an overlay they opened.
   if (loading || error || !lead) {
-    return (
+    return ReactDOM.createPortal(
       <div className="modal">
         <div className="modal-content">
           <h2>Lead Details{leadNumber ? ` - ${leadNumber}` : ""}</h2>
@@ -206,7 +209,8 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate, startInEditMode = false })
               : "No lead found"}
           </p>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
@@ -426,9 +430,36 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate, startInEditMode = false })
       fieldName.slice(role.length).charAt(0).toLowerCase() +
       fieldName.slice(role.length + 1);
 
+    // Undefined means "never explicitly marked" — treated as active so every
+    // contact saved before this field existed doesn't suddenly read inactive.
+    const isActive = contactData.active !== false;
+
     return (
-      <div className="contact-role-ld">
-        <h4>{role.toUpperCase()} Contact</h4>
+      <div className={`contact-role-ld ${!isActive ? "is-inactive-contact" : ""}`}>
+        <div className="ld-contact-head-row">
+          <h4>{role.toUpperCase()} Contact</h4>
+          <label className="ld-active-toggle">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setEditedLead((prev) => ({
+                  ...prev,
+                  contactInfo: {
+                    ...prev.contactInfo,
+                    [role]: {
+                      ...prev.contactInfo?.[role],
+                      active: checked,
+                    },
+                  },
+                }));
+              }}
+              disabled={!editMode}
+            />
+            {isActive ? "Active" : "No longer with the company"}
+          </label>
+        </div>
         <div className="form-row-ld">
           {fieldsConfig.map((field) => {
             const storedKey = storedKeyFor(field.name);
@@ -462,35 +493,170 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate, startInEditMode = false })
     );
   };
 
-  return (
-    <div className="modal">
-      <div className="modal-content">
-        <h2>Lead Details - {lead.leadNumber}</h2>
-        <button onClick={onClose} disabled={saving}>
-          Close
-        </button>
-        {/* Everyone can open a lead; only its creator, their manager, or an
-            Admin may change it. The server decides and reports canEdit, so the
-            button is never offered where the save would be refused. */}
-        {lead.canEdit && (
-          <button
-            onClick={() => (editMode ? handleCancel() : setEditMode(true))}
-            disabled={saving}
+  // Contacts beyond the three fixed roles — however many the lead needs.
+  // Mirrors CreateLeads' "Other Contact Section" pattern so a lead is never
+  // stuck with only the contacts it happened to have at creation time.
+  const additionalContacts = editedLead.contactInfo?.additional || [];
+
+  const updateAdditionalContact = (index, key, value) => {
+    setEditedLead((prev) => {
+      const list = [...(prev.contactInfo?.additional || [])];
+      list[index] = { ...list[index], [key]: value };
+      return { ...prev, contactInfo: { ...prev.contactInfo, additional: list } };
+    });
+  };
+
+  const addAdditionalContact = () => {
+    setEditedLead((prev) => {
+      const list = [...(prev.contactInfo?.additional || [])];
+      list.push({ sectionTitle: `Other Contact Section ${list.length + 1}` });
+      return { ...prev, contactInfo: { ...prev.contactInfo, additional: list } };
+    });
+  };
+
+  const removeAdditionalContact = (index) => {
+    setEditedLead((prev) => {
+      const list = (prev.contactInfo?.additional || []).filter((_, i) => i !== index);
+      return { ...prev, contactInfo: { ...prev.contactInfo, additional: list } };
+    });
+  };
+
+  const renderAdditionalContacts = () => {
+    // Same six fields every fixed contact role uses (name, dlExt,
+    // designation, mobile, email, personalEmail), with the "it" prefix
+    // stripped, matching how they're stored on each section object.
+    const baseFields = (contactFormConfig.find((c) => c.role === "IT")?.fields || []).map(
+      (f) => ({ ...f, name: f.name.replace(/^it/, "").toLowerCase() })
+    );
+
+    return (
+      <div className="ld-additional-contacts">
+        {additionalContacts.map((section, index) => {
+          const isActive = section.active !== false;
+          return (
+          <div
+            className={`contact-role-ld ld-additional-contact-block ${!isActive ? "is-inactive-contact" : ""}`}
+            key={index}
           >
-            {editMode ? "Cancel" : "Edit"}
-          </button>
-        )}
-        {!lead.canEdit && (
-          <span className="lead-readonly-note">
-            View only — this lead can be edited by its creator, their manager,
-            or an Admin.
-          </span>
-        )}
+            <div className="ld-additional-contact-head">
+              {editMode ? (
+                <input
+                  type="text"
+                  className="ld-section-title-input"
+                  value={section.sectionTitle || `Other Contact Section ${index + 1}`}
+                  onChange={(e) => updateAdditionalContact(index, "sectionTitle", e.target.value)}
+                  placeholder="e.g. Procurement Head, CTO, Operations..."
+                />
+              ) : (
+                <h4>{section.sectionTitle || `Other Contact Section ${index + 1}`}</h4>
+              )}
+              <label className="ld-active-toggle">
+                <input
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={(e) => updateAdditionalContact(index, "active", e.target.checked)}
+                  disabled={!editMode}
+                />
+                {isActive ? "Active" : "No longer with the company"}
+              </label>
+              {editMode && (
+                <button
+                  type="button"
+                  className="ld-remove-contact-btn"
+                  onClick={() => removeAdditionalContact(index)}
+                  title="Remove this contact section"
+                >
+                  ✕ Remove
+                </button>
+              )}
+            </div>
+            <div className="form-row-ld">
+              {baseFields.map((field) => (
+                <div className="form-group-ld" key={field.name}>
+                  <label>{field.label}:</label>
+                  <input
+                    type={field.type}
+                    value={section[field.name] || ""}
+                    onChange={(e) => updateAdditionalContact(index, field.name, e.target.value)}
+                    disabled={!editMode}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+          );
+        })}
+
         {editMode && (
-          <button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Save Changes"}
+          <button type="button" className="ld-add-contact-btn" onClick={addAdditionalContact}>
+            + Add Other Contact Section
           </button>
         )}
+      </div>
+    );
+  };
+
+  // Only the entry explicitly tagged at creation (CreateLeads' required
+  // "Description" field) describes the lead itself — everything else,
+  // including every note added later from the lead's own Edit form *and*
+  // every note logged when returning a Cold-pulled lead to the pool (they
+  // write into this exact same array), is a genuine activity entry and
+  // belongs in the log, newest first. A lead with no tagged entry (older
+  // data, or one whose pull history was reset) simply has no separate
+  // Description section — every note it has is activity.
+  const allDescriptions = lead.descriptions || [];
+  const leadDescription = allDescriptions.find((d) => d.type === "description") || null;
+  const activityEntries = allDescriptions
+    .map((desc, index) => ({ ...desc, _index: index }))
+    .filter((desc) => desc.type !== "description")
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+  // Rendered via a portal to document.body — this component gets mounted
+  // from all over the app (Home's header search, lead lists, Cold Leads,
+  // etc.), and some of those ancestors (the Home dashboard in particular)
+  // apply a CSS `zoom` for its fluid-scale layout. `zoom` on an ancestor can
+  // throw off a plain `position: fixed` overlay's coordinates, which showed
+  // up as this modal opening pinned near the top of the page instead of
+  // centered. A portal renders straight under <body>, outside any such
+  // ancestor, so centering is always relative to the real viewport.
+  return ReactDOM.createPortal(
+    <div className="modal">
+      <div className="modal-content ld-modal-content">
+        <header className="ld-header">
+          <div className="ld-header-title">
+            <h2>{lead.companyInfo?.companyName || `Lead #${lead.leadNumber}`}</h2>
+            <span className="ld-header-subtitle">Lead #{lead.leadNumber}</span>
+          </div>
+          <div className="ld-header-actions">
+            {!lead.canEdit && (
+              <span className="lead-readonly-note">
+                View only — editable by its creator, their manager, whoever
+                it's assigned to, or an Admin.
+              </span>
+            )}
+            {editMode && (
+              <button
+                className="ld-btn ld-btn-save"
+                onClick={handleSave}
+                disabled={saving}
+              >
+                {saving ? "Saving…" : "Save Changes"}
+              </button>
+            )}
+            {lead.canEdit && (
+              <button
+                className="ld-btn ld-btn-edit"
+                onClick={() => (editMode ? handleCancel() : setEditMode(true))}
+                disabled={saving}
+              >
+                {editMode ? "Cancel" : "Edit"}
+              </button>
+            )}
+            <button className="ld-btn ld-btn-close" onClick={onClose} disabled={saving}>
+              Close
+            </button>
+          </div>
+        </header>
 
         {actionError && (
           <p className="lead-details-error" role="alert">
@@ -498,78 +664,122 @@ const LeadDetails = ({ leadNumber, onClose, onUpdate, startInEditMode = false })
           </p>
         )}
 
-        {/* Company Information */}
-        <section className="form-section-ld">
-          <h3>Company Information</h3>
-          {renderFields(companyFormConfig, "companyInfo")}
-        </section>
+        {/* Bulk-imported leads land in the Cold Pool with most fields
+            deliberately blank — this is the nudge to fill them in once
+            someone has actually called the contact. Soft, not blocking. */}
+        {lead.companyInfo?.importMeta?.missingFields?.length > 0 && (
+          <p className="lead-details-import-banner">
+            📥 Bulk-imported from "{lead.companyInfo.importMeta.originalFileName}" —
+            please fill in after calling: {lead.companyInfo.importMeta.missingFields.join(", ")}.
+          </p>
+        )}
 
-        {/* Contact Information */}
-        <section className="form-section-ld">
-          <h3>Contact Information</h3>
-          {renderContactFields("it")}
-          {renderContactFields("finance")}
-          {renderContactFields("businessHead")}
-        </section>
+        <div className="ld-body">
+          {/* Main details — everything but the activity log, independently
+              scrollable so a long form never pushes the activity panel out
+              of view. */}
+          <div className="ld-main">
+            {leadDescription && (
+              <section className="form-section-ld ld-description-section">
+                <h3>Description</h3>
+                <p className="ld-description-text">{leadDescription.description}</p>
+                <span className="ld-description-meta">
+                  Added by{" "}
+                  {leadDescription.addedBy?.firstName ||
+                    (leadDescription.addedBy ? `User #${idOf(leadDescription.addedBy)}` : "Unknown")}
+                  {leadDescription.createdAt
+                    ? ` · ${formatDateTime(leadDescription.createdAt)}`
+                    : ""}
+                </span>
+              </section>
+            )}
 
-        {/* IT Landscape */}
-        <section className="form-section-ld">
-          <h3>IT Landscape</h3>
-          <h4>Net New</h4>
-          {renderFields(itLandscapeConfig.netNew, "itLandscape", "netNew")}
-          <h4>SAP Installed Base</h4>
-          {renderFields(
-            itLandscapeConfig.SAPInstalledBase,
-            "itLandscape",
-            "SAPInstalledBase"
-          )}
-        </section>
+            <section className="form-section-ld">
+              <h3>Company Information</h3>
+              {renderFields(companyFormConfig, "companyInfo")}
+            </section>
 
-        {/* Descriptions */}
-        <section className="form-section-ld">
-          <h3>Descriptions</h3>
-          <div className="form-group">
-            <label>New Description:</label>
-            <textarea
-              value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
-              placeholder="Add a new description"
-              disabled={!editMode}
-            />
+            <section className="form-section-ld">
+              <h3>Contact Information</h3>
+              {renderContactFields("it")}
+              {renderContactFields("finance")}
+              {renderContactFields("businessHead")}
+              {renderAdditionalContacts()}
+            </section>
+
+            <section className="form-section-ld">
+              <h3>IT Landscape</h3>
+              <h4>Net New</h4>
+              {renderFields(itLandscapeConfig.netNew, "itLandscape", "netNew")}
+              <h4>SAP Installed Base</h4>
+              {renderFields(
+                itLandscapeConfig.SAPInstalledBase,
+                "itLandscape",
+                "SAPInstalledBase"
+              )}
+            </section>
           </div>
-          <button onClick={handleAddDescription} disabled={!editMode}>
-            Add Description
-          </button>
 
-          <table className="descriptions-table">
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th>Date</th>
-                <th>Added by</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lead.descriptions &&
-                lead.descriptions.map((desc, index) => (
-                  <tr key={index}>
-                    <td>{desc.description}</td>
-                    <td>
-                      {desc.createdAt
-                        ? new Date(desc.createdAt).toLocaleString()
-                        : "—"}
-                    </td>
-                    <td>
-                      {desc.addedBy?.firstName ||
-                        (desc.addedBy ? `User #${idOf(desc.addedBy)}` : "Unknown")}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </section>
+          {/* Activity — persistent on the right so who-did-what-and-when is
+              always visible while the rest of the lead is being reviewed or
+              edited, instead of being buried below a long form. */}
+          <aside className="ld-activity">
+            <div className="ld-activity-head">
+              <h3>Activity</h3>
+              <span className="ld-activity-count">
+                {activityEntries.length} entr{activityEntries.length === 1 ? "y" : "ies"}
+              </span>
+            </div>
+
+            <div className="ld-activity-add">
+              <textarea
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                placeholder={
+                  editMode
+                    ? "Log what you did — a call, an email, a note for the next person…"
+                    : "Enter Edit mode to log an action"
+                }
+                disabled={!editMode}
+              />
+              <button
+                className="ld-btn ld-btn-add-activity"
+                onClick={handleAddDescription}
+                disabled={!editMode || !newDescription.trim()}
+              >
+                Add Action
+              </button>
+            </div>
+
+            <div className="ld-activity-list">
+              {activityEntries.length === 0 ? (
+                <p className="ld-activity-empty">
+                  No actions logged yet for this lead.
+                </p>
+              ) : (
+                activityEntries.map((desc) => (
+                  <div className="ld-activity-item" key={desc._index}>
+                    <div className="ld-activity-item-head">
+                      <span className="ld-activity-author">
+                        {desc.addedBy?.firstName ||
+                          (desc.addedBy ? `User #${idOf(desc.addedBy)}` : "Unknown")}
+                      </span>
+                      <span className="ld-activity-time">
+                        {desc.createdAt
+                          ? formatDateTime(desc.createdAt)
+                          : "—"}
+                      </span>
+                    </div>
+                    <p className="ld-activity-text">{desc.description}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </aside>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

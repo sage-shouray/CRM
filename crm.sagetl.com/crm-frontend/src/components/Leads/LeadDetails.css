@@ -29,6 +29,19 @@
   box-sizing: border-box;
 }
 
+/* Lead Details is the one modal that gets the bigger, two-pane treatment —
+   a full-detail workspace rather than a small popup form. */
+.ld-modal-content {
+  max-width: 1440px;
+  width: 95%;
+  height: 92vh;
+  max-height: 92vh;
+  padding: 26px 30px 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* Heading */
 .modal-content h2 {
   font-size: 24px;
@@ -42,8 +55,44 @@
   text-align: left;
 }
 
-/* Button overrides based on child position in modal-content header */
-.modal-content > button {
+/* Sticky header bar: title on the left, actions on the right, never scrolls
+   away with the rest of the form. */
+.ld-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  border-bottom: 1.5px solid var(--slate-200);
+  padding-bottom: 18px;
+  margin-bottom: 0;
+}
+
+.ld-header-title h2 {
+  margin: 0;
+  border: none;
+  padding: 0;
+  font-size: 24px;
+}
+
+.ld-header-subtitle {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--slate-500);
+  letter-spacing: 0.3px;
+}
+
+.ld-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ld-btn {
   padding: 10px 18px;
   font-size: 13.5px;
   font-weight: 700;
@@ -51,43 +100,243 @@
   cursor: pointer;
   border: none;
   transition: all var(--transition-fast);
-  margin-right: 8px;
-  margin-bottom: 24px;
+  white-space: nowrap;
 }
 
-/* Close Button (1st button) */
-.modal-content > button:nth-of-type(1) {
+.ld-btn-close {
   background-color: var(--slate-100);
   color: var(--slate-700);
   border: 1.5px solid var(--slate-200);
 }
 
-.modal-content > button:nth-of-type(1):hover {
+.ld-btn-close:hover {
   background-color: var(--slate-200);
   color: var(--slate-900);
 }
 
-/* Edit / Cancel Button (2nd button) */
-.modal-content > button:nth-of-type(2) {
+.ld-btn-edit {
   background: var(--slate-800);
   color: white;
 }
 
-.modal-content > button:nth-of-type(2):hover {
+.ld-btn-edit:hover {
   background-color: var(--slate-900);
   transform: translateY(-1px);
 }
 
-/* Save Changes Button (3rd button) */
-.modal-content > button:nth-of-type(3) {
+.ld-btn-save {
   background: linear-gradient(135deg, #10b981, #059669);
   color: white;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
 }
 
-.modal-content > button:nth-of-type(3):hover {
+.ld-btn-save:hover {
   box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
   transform: translateY(-1px);
+}
+
+.ld-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Two-pane body: scrollable form on the left, persistent activity log on
+   the right. Each pane scrolls independently. */
+.ld-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 24px;
+  padding: 20px 0 26px;
+}
+
+.ld-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.ld-activity {
+  flex: 0 0 380px;
+  width: 380px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.ld-activity-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--slate-200);
+  background: #ffffff;
+}
+
+.ld-activity-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--slate-800);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ld-activity-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--slate-500);
+}
+
+.ld-activity-add {
+  flex-shrink: 0;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--slate-200);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #ffffff;
+}
+
+.ld-activity-add textarea {
+  width: 100%;
+  min-height: 70px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1.5px solid var(--slate-200);
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  box-sizing: border-box;
+  resize: vertical;
+  transition: all var(--transition-fast);
+}
+
+.ld-activity-add textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.ld-activity-add textarea:disabled {
+  background-color: var(--slate-100);
+  color: var(--slate-500);
+  cursor: not-allowed;
+}
+
+.ld-btn-add-activity {
+  align-self: flex-end;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: none;
+  background: var(--primary-gradient);
+  color: white;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+  transition: all var(--transition-fast);
+}
+
+.ld-btn-add-activity:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
+  transform: translateY(-1px);
+}
+
+.ld-btn-add-activity:disabled {
+  background: var(--slate-200);
+  color: var(--slate-400);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.ld-activity-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ld-activity-empty {
+  margin: 20px 0 0;
+  text-align: center;
+  color: var(--slate-500);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.ld-activity-item {
+  background: #ffffff;
+  border: 1px solid var(--slate-200);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-subtle);
+}
+
+.ld-activity-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.ld-activity-author {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--slate-800);
+}
+
+.ld-activity-time {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--slate-500);
+  white-space: nowrap;
+}
+
+.ld-activity-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--slate-700);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* The lead's own description (written at creation) — distinct from the
+   activity log, which only holds what's happened to the lead since. */
+.ld-description-section {
+  background: var(--primary-light);
+  border-color: var(--primary-border);
+}
+
+.ld-description-text {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--slate-800);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ld-description-meta {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--primary-hover);
+  letter-spacing: 0.2px;
 }
 
 /* Add Description Button */
@@ -327,6 +576,19 @@
   font-weight: 600;
 }
 
+/* Soft nudge on a bulk-imported lead — lists what's still blank so the
+   person who pulled it fills it in after actually calling the contact. */
+.lead-details-import-banner {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background-color: #fffbeb;
+  color: #92400e;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
 /* Shown in place of the Edit button for someone with read-only access to a
    lead — every user can open every company, but only the creator, their
    manager, or an Admin may change one. */
@@ -339,4 +601,218 @@
   color: #475569;
   font-size: 12.5px;
   font-style: italic;
+}
+
+/* Below this, the two panes no longer fit side by side — stack the activity
+   log under the main form and let the whole card scroll as one column. */
+@media (max-width: 1024px) {
+  .ld-modal-content {
+    height: 94vh;
+    max-height: 94vh;
+    padding: 20px 20px 0;
+  }
+
+  .ld-body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .ld-main {
+    overflow-y: visible;
+    padding-right: 0;
+  }
+
+  .ld-activity {
+    flex: none;
+    width: 100%;
+    max-height: 60vh;
+  }
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    width: 94%;
+    padding: 20px;
+    max-height: 92vh;
+  }
+
+  .modal-content h2 {
+    font-size: 19px;
+  }
+
+  .form-group-ld {
+    min-width: 0;
+    flex-basis: 100%;
+  }
+
+  .ld-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ld-header-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    width: 100%;
+    padding: 16px;
+    border-radius: var(--radius-md);
+  }
+
+  .modal-content > button {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .ld-modal-content {
+    width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    padding: 16px 16px 0;
+  }
+
+  .ld-header-actions {
+    width: 100%;
+  }
+
+  .ld-btn {
+    flex: 1;
+  }
+}
+
+/* ---- Extra contact sections (beyond IT / Finance / Business Head) ---- */
+.ld-additional-contacts {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.ld-additional-contact-block {
+  border-left: 4px solid var(--primary);
+  background: #ffffff;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-subtle);
+}
+
+.ld-additional-contact-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--slate-200);
+  flex-wrap: wrap;
+}
+
+.ld-additional-contact-head h4 {
+  margin: 0;
+}
+
+.ld-section-title-input {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary-hover);
+  border: 1.5px solid var(--primary-border);
+  background: var(--primary-light);
+  padding: 8px 12px;
+  border-radius: var(--radius-xs);
+  flex: 1;
+  min-width: 200px;
+}
+
+.ld-section-title-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3.5px var(--primary-glow);
+  background: #ffffff;
+}
+
+.ld-remove-contact-btn {
+  background: var(--danger-bg);
+  color: var(--danger-hover);
+  border: 1px solid var(--danger-border);
+  padding: 7px 16px;
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.ld-remove-contact-btn:hover {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+.ld-add-contact-btn {
+  align-self: flex-start;
+  padding: 10px 18px;
+  background-color: transparent;
+  color: var(--slate-700);
+  border: 1.5px solid var(--slate-300);
+  border-radius: var(--radius-xs);
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ld-add-contact-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background-color: var(--primary-light);
+}
+
+/* ---- Whether a contact is still with the company ---- */
+.ld-contact-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ld-contact-head-row h4 {
+  margin: 0;
+}
+
+.ld-active-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--success-hover);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ld-active-toggle input {
+  width: auto !important;
+  margin: 0;
+  accent-color: var(--success);
+}
+
+/* A contact marked inactive keeps its data visible but reads as no-longer-
+   current — a dimmed card with a red-tinted left edge, rather than removed. */
+.contact-role-ld.is-inactive-contact {
+  opacity: 0.72;
+  border-left: 4px solid var(--danger);
+  padding-left: 12px;
+}
+
+.is-inactive-contact .ld-active-toggle {
+  color: var(--danger-hover);
+}
+
+.is-inactive-contact .ld-active-toggle input {
+  accent-color: var(--danger);
 }

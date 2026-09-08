@@ -3,6 +3,7 @@ import { API_BASE_URL } from "../../config";
 import { roleLabel } from "../../roles";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { useLiveUpdates } from "../../liveUpdates";
 import "./TeamOverview.css"; // Add the CSS file
 
 const TeamOverview = () => {
@@ -31,6 +32,10 @@ const TeamOverview = () => {
     }
   };
 
+  // A lead created/assigned or a task worked by anyone on the team should
+  // move these counts without waiting for a manual refresh.
+  useLiveUpdates(["leads", "tasks", "users"], fetchUsers);
+
   const viewLeads = (userId) => {
     navigate(`/leads/${userId}`);
   };
@@ -39,7 +44,7 @@ const TeamOverview = () => {
     <div className="user-management-container">
       <h1 className="user-heading">Team Overview</h1>
       {error && <p className="error-message">{error}</p>}
-      <div>
+      <div className="table-scroll-wrapper">
         <table className="user-table">
           <thead>
             <tr>

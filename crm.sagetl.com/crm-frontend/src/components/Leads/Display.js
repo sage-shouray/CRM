@@ -5,6 +5,7 @@ import "./Display.css";
 
 import { API_BASE_URL } from "../../config";
 import { useLiveUpdates } from "../../liveUpdates";
+import { formatDate } from "../../dateFormat";
 
 const Display = () => {
   const [leads, setLeads] = useState([]);
@@ -129,7 +130,7 @@ const Display = () => {
   const getLatestDescriptionDate = (lead) => {
     if (lead.descriptions && lead.descriptions.length > 0) {
       const dates = lead.descriptions.map((desc) => new Date(desc.createdAt));
-      return new Date(Math.max(...dates)).toLocaleDateString();
+      return formatDate(new Date(Math.max(...dates)));
     }
     return "";
   };
@@ -259,6 +260,7 @@ const Display = () => {
       {error && <div>Error: {error}</div>}
       {leads.length === 0 && !loading && <div>No leads found</div>}
 
+      <div className="table-scroll-wrapper">
       <table>
         <thead>
           <tr>
@@ -288,7 +290,7 @@ const Display = () => {
                   {lead.leadNumber || ""}
                 </button>
               </td>
-              <td>{new Date(lead.createdAt).toLocaleDateString()}</td>
+              <td>{formatDate(lead.createdAt)}</td>
               <td>
                 {lead.companyInfo?.companyName ? (
                   <button
@@ -310,9 +312,7 @@ const Display = () => {
               <td>{getAssignedUser(lead)}</td>
               <td>{getPhoneNumbers(lead)}</td>
               <td>
-                {lead.companyInfo?.dateField
-                  ? new Date(lead.companyInfo.dateField).toLocaleDateString()
-                  : ""}
+                {formatDate(lead.companyInfo?.dateField)}
               </td>
               <td>{lead.companyInfo?.priority || ""}</td>
               <td>{lead.companyInfo?.nextAction || ""}</td>
@@ -320,6 +320,7 @@ const Display = () => {
           ))}
         </tbody>
       </table>
+      </div>
 
       {selectedLead && (
         <LeadDetails

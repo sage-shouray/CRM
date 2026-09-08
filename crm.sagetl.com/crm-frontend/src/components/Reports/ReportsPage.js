@@ -15,6 +15,9 @@ import SidebarReports from "../Sidebar/SidebarReports";
 import { roleShortLabel } from "../../roles";
 import { API_BASE_URL } from "../../config";
 import DailyActivityReport from "./DailyActivityReport";
+import ColdLeadsReport from "./ColdLeadsReport";
+import { useLiveUpdates } from "../../liveUpdates";
+import { formatDate } from "../../dateFormat";
 import "./ReportsPage.css";
 
 const TABS = [
@@ -23,11 +26,7 @@ const TABS = [
   { key: "tasks", label: "Tasks" },
 ];
 
-const fmtDate = (value) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
-};
+const fmtDate = (value) => formatDate(value) || "—";
 
 const statusLabel = (status) => (status || "pending").replace(/_/g, " ");
 
@@ -91,6 +90,10 @@ function ReportsPage() {
   useEffect(() => {
     load(selectedUserId || null);
   }, [load, selectedUserId]);
+
+  // A lead created/updated, a note logged, or a task worked anywhere in the
+  // system should move these numbers immediately, not just on next page load.
+  useLiveUpdates(["leads", "tasks"], () => load(selectedUserId || null));
 
   // Contracts expiring in the next three months — the same set the scheduled
   // report covers, shown live so the page is not just a file list.
@@ -352,7 +355,7 @@ function ReportsPage() {
                       <td>{r.companyName || "—"}</td>
                       <td>#{r.leadNumber}</td>
                       <td>
-                        {r.expiry}
+                        {formatDate(r.expiry)}
                         {!r.exact && (
                           <span
                             className="rp-approx"
@@ -495,6 +498,8 @@ function ReportsPage() {
               {renderDetail()}
             </section>
           )}
+
+          <ColdLeadsReport />
 
           <section className="rp-panel">
             <header className="rp-panel-head">

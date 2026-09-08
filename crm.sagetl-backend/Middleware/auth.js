@@ -13,7 +13,7 @@ const statusCache = new Map();
 
 const accountState = async (userId) => {
   const cached = statusCache.get(userId);
-  if (cached && cached.until > Date.now()) return cached.value;
+  if (cached?.until > Date.now()) return cached.value;
 
   const user = await User.findById(userId);
   const value = user
@@ -34,7 +34,7 @@ const invalidateAccountState = (userId) => {
 // attaches the decoded user to req.user.
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
+  const token = authHeader?.split(" ")[1];
 
   if (!token) return res.status(401).json({ error: "Token missing" });
 

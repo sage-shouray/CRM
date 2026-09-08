@@ -1,0 +1,627 @@
+.bulk-import-page {
+  padding: 16px 20px 40px;
+  max-width: 1300px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bi-head h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--slate-900);
+  margin: 0;
+  letter-spacing: -0.4px;
+}
+
+.bi-head h1 svg {
+  color: var(--primary);
+}
+
+.bi-head p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--slate-500);
+  max-width: 780px;
+}
+
+.bi-error {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-hover);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Step 1: upload -------------------------------------------------------- */
+
+.bi-upload-box {
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  padding: 40px;
+  box-shadow: var(--shadow-sm);
+}
+
+.bi-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 2px dashed var(--slate-300);
+  border-radius: 12px;
+  padding: 48px 20px;
+  cursor: pointer;
+  color: var(--slate-500);
+  font-size: 14px;
+  font-weight: 600;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.bi-dropzone:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.bi-dropzone svg {
+  font-size: 28px;
+}
+
+.bi-manual-link-row {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--slate-500);
+}
+
+.bi-manual-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  margin-left: 4px;
+}
+
+/* Step 2: mapping --------------------------------------------------------- */
+
+.bi-map-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.bi-map-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.bi-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--slate-100);
+  border: 1px solid var(--slate-200);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--slate-700);
+  cursor: pointer;
+}
+
+.bi-inline-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--slate-600);
+}
+
+.bi-inline-field select,
+.bi-inline-field input {
+  padding: 5px 8px;
+  border: 1px solid var(--slate-300);
+  border-radius: 6px;
+  font-size: 12.5px;
+}
+
+.bi-inline-field input[type="number"] {
+  width: 60px;
+}
+
+.bi-row-count {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--slate-500);
+  font-weight: 600;
+}
+
+.bi-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--slate-600);
+}
+
+.bi-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--slate-200);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.bi-preset-chip button {
+  border: none;
+  background: #fff;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bi-preset-chip button:first-child:hover {
+  background: var(--slate-100);
+}
+
+.bi-preset-delete {
+  color: var(--danger-hover);
+  padding: 6px 10px !important;
+  border-left: 1px solid var(--slate-200) !important;
+}
+
+.bi-mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.bi-mapping-group {
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.bi-mapping-group h3 {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--slate-500);
+}
+
+.bi-mapping-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.bi-mapping-row label {
+  font-size: 12.5px;
+  color: var(--slate-700);
+  flex: 1;
+}
+
+.bi-required {
+  color: var(--danger-hover);
+}
+
+.bi-mapping-row select {
+  flex: 1.2;
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid var(--slate-300);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.bi-split-section {
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.bi-split-header h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--slate-800);
+}
+
+.bi-split-header p {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--slate-500);
+}
+
+.bi-add-split-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bi-split-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-top: 1px solid var(--slate-100);
+  font-size: 12.5px;
+  color: var(--slate-600);
+}
+
+.bi-split-rule select {
+  padding: 5px 6px;
+  border: 1px solid var(--slate-300);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.bi-delimiter-input {
+  width: 40px;
+  text-align: center;
+  padding: 5px 4px;
+  border: 1px solid var(--slate-300);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.bi-icon-btn {
+  border: 1px solid var(--slate-200);
+  background: var(--slate-100);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  color: var(--slate-600);
+}
+
+.bi-icon-btn-danger {
+  color: var(--danger-hover);
+}
+
+.bi-save-preset-row {
+  display: flex;
+  gap: 10px;
+}
+
+.bi-save-preset-row input {
+  flex: 1;
+  max-width: 360px;
+  padding: 8px 10px;
+  border: 1px solid var(--slate-300);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+.bi-save-preset-row button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--slate-300);
+  background: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bi-save-preset-row button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bi-preview-section {
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.bi-preview-section h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--slate-700);
+}
+
+.bi-table-wrap {
+  overflow-x: auto;
+}
+
+.bi-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.bi-preview-table th,
+.bi-preview-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--slate-100);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.bi-preview-table th {
+  color: var(--slate-500);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.bi-commit-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.bi-commit-btn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bi-commit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Step 3: confirm — the "how many, what fields, which are duplicates"
+   notification the admin sees before anything is written. ------------- */
+
+.bi-confirm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bi-confirm-summary {
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.bi-confirm-summary h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  color: var(--slate-900);
+}
+
+.bi-confirm-summary p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--slate-500);
+}
+
+.bi-confirm-note {
+  margin-top: 8px !important;
+  color: #92400e !important;
+  font-weight: 600;
+}
+
+.bi-confirm-note-block {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-md);
+  padding: 14px 20px;
+}
+
+.bi-confirm-note-block strong {
+  display: block;
+  font-size: 13px;
+  color: #1e40af;
+  margin-bottom: 4px;
+}
+
+.bi-confirm-note-block p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--slate-500);
+}
+
+.bi-dup-badge-file {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.bi-duplicate-choice {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+}
+
+.bi-duplicate-choice strong {
+  display: block;
+  font-size: 13px;
+  color: #92400e;
+  margin-bottom: 10px;
+}
+
+.bi-duplicate-choice-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bi-duplicate-choice-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--slate-700);
+  cursor: pointer;
+}
+
+.bi-confirm-table-wrap {
+  max-height: 480px;
+  overflow-y: auto;
+  /* Every column gets a fixed share of the container width below instead
+     of growing to fit its longest value, so all 8 columns always fit
+     inside the page — no horizontal scrollbar to fight with while
+     reviewing hundreds of rows. */
+  overflow-x: hidden;
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.bi-confirm-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.bi-confirm-table th,
+.bi-confirm-table td {
+  white-space: normal;
+  overflow-wrap: break-word;
+  font-size: 11.5px;
+  padding: 7px 8px;
+}
+
+.bi-confirm-table th:nth-child(1), .bi-confirm-table td:nth-child(1) { width: 15%; } /* Company */
+.bi-confirm-table th:nth-child(2), .bi-confirm-table td:nth-child(2) { width: 9%; }  /* City */
+.bi-confirm-table th:nth-child(3), .bi-confirm-table td:nth-child(3) { width: 8%; }  /* Vertical */
+.bi-confirm-table th:nth-child(4), .bi-confirm-table td:nth-child(4) { width: 12%; } /* IT Contact */
+.bi-confirm-table th:nth-child(5), .bi-confirm-table td:nth-child(5) { width: 10%; } /* Mobile */
+.bi-confirm-table th:nth-child(6), .bi-confirm-table td:nth-child(6) { width: 19%; } /* Email */
+.bi-confirm-table th:nth-child(7), .bi-confirm-table td:nth-child(7) { width: 8%; }  /* Turnover */
+.bi-confirm-table th:nth-child(8), .bi-confirm-table td:nth-child(8) { width: 19%; } /* Status */
+
+.bi-confirm-table thead th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.bi-confirm-table tr.is-duplicate-row {
+  background: #fef2f2;
+}
+
+.bi-dup-badge {
+  display: inline-block;
+  max-width: 100%;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.bi-new-badge {
+  display: inline-block;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.bi-confirm-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Step 4: result ---------------------------------------------------------- */
+
+.bi-result-section {
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  padding: 32px;
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+}
+
+.bi-result-icon {
+  font-size: 40px;
+  color: #16a34a;
+  margin-bottom: 10px;
+}
+
+.bi-result-section h2 {
+  margin: 0 0 18px;
+  font-size: 18px;
+  color: var(--slate-900);
+}
+
+.bi-result-block {
+  text-align: left;
+  max-width: 560px;
+  margin: 0 auto 16px;
+  background: var(--slate-50, #f8fafc);
+  border: 1px solid var(--slate-200);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.bi-result-block h4 {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: var(--slate-700);
+}
+
+.bi-result-block ul {
+  margin: 0;
+  padding: 0 0 0 18px;
+  font-size: 12px;
+  color: var(--slate-500);
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.bi-result-mapping {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}

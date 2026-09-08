@@ -8,6 +8,7 @@ import {
   faLock,
 } from "@fortawesome/free-solid-svg-icons";
 import { API_BASE_URL } from "../../config";
+import { formatLongDate, formatShortWeekday } from "../../dateFormat";
 import "./DailyLog.css";
 
 // "What did you do today" — one entry per person per day.
@@ -24,12 +25,7 @@ function DailyLog() {
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
 
-  const todayLabel = new Date().toLocaleDateString(undefined, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const todayLabel = formatLongDate();
 
   const load = useCallback(async () => {
     try {
@@ -160,10 +156,7 @@ function DailyLog() {
             <article className="daily-log-past" key={entry.id}>
               <header>
                 <strong>
-                  {new Date(entry.work_date + "T00:00:00").toLocaleDateString(
-                    undefined,
-                    { weekday: "short", day: "numeric", month: "short" }
-                  )}
+                  {formatShortWeekday(entry.work_date + "T00:00:00")}
                 </strong>
                 <span className="daily-log-locked">
                   <FontAwesomeIcon icon={faLock} /> locked

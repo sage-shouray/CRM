@@ -1231,3 +1231,60 @@
     font-size: 28px;
     cursor: pointer;
 }
+
+/* Back button: only meaningful once the two panes stop sitting side by side,
+   so it stays hidden above the mobile breakpoint. */
+.chat-back-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    color: var(--slate-600);
+    font-size: 16px;
+    cursor: pointer;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-right: 4px;
+    transition: background var(--transition-fast);
+}
+
+.chat-back-btn:hover {
+    background: var(--slate-200);
+}
+
+/* Below this width there is only room for one pane. Both panes stay full
+   width; which one is visible is driven by .mobile-show-chat on the
+   container instead of anything shrinking to fit. */
+@media (max-width: 860px) {
+    .chat-container {
+        margin: 0;
+        height: 100vh;
+        max-width: 100%;
+        border-radius: 0;
+        border: none;
+    }
+
+    .chat-sidebar {
+        width: 100%;
+    }
+
+    .chat-sidebar,
+    .chat-main-window {
+        display: none;
+    }
+
+    .chat-container:not(.mobile-show-chat) .chat-sidebar {
+        display: flex;
+    }
+
+    .chat-container.mobile-show-chat .chat-main-window {
+        display: flex;
+    }
+
+    .chat-back-btn {
+        display: flex;
+    }
+}

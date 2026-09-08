@@ -541,3 +541,136 @@
   font-size: 12.5px;
   font-weight: 600;
 }
+
+/* Centered submit-result popup — shown after every submit attempt, whether
+   it succeeded (with the assigned lead number) or failed (with the list of
+   reasons it couldn't be saved). Rendered via a portal so it always centers
+   on the real viewport, not whatever zoomed/scaled ancestor the form sits
+   inside. */
+.lead-notice-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 16px;
+}
+
+.lead-notice-box {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 28px 26px 22px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+
+.lead-notice-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.lead-notice-box.is-success .lead-notice-icon {
+  background: #16a34a;
+}
+
+.lead-notice-box.is-error .lead-notice-icon {
+  background: #dc2626;
+}
+
+.lead-notice-box h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.lead-notice-number {
+  font-size: 15px;
+  margin: 0 0 4px;
+}
+
+.lead-notice-subtext {
+  font-size: 13px;
+  color: #555;
+  margin: 0 0 10px;
+}
+
+.lead-notice-list {
+  text-align: left;
+  margin: 0 0 16px;
+  padding: 0 0 0 20px;
+  font-size: 13px;
+  color: #b91c1c;
+}
+
+.lead-notice-list li {
+  margin-bottom: 6px;
+}
+
+.lead-notice-close-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 26px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  color: #fff;
+  background: #2563eb;
+}
+
+.lead-notice-box.is-success .lead-notice-close-btn {
+  background: #16a34a;
+}
+
+.lead-notice-box.is-error .lead-notice-close-btn {
+  background: #dc2626;
+}
+
+/* Native date pickers always render their text in the browser/OS's own
+   locale order (mm/dd/yyyy on a US-configured machine), which can't be
+   overridden with any input attribute. Instead of showing that text next to
+   a second, separate readout, the native text itself is hidden and a
+   dd/mm/yyyy overlay is drawn in its place — same box, one date, always in
+   the app's format. The calendar icon (a browser-drawn pseudo-element, not
+   part of the text) is unaffected and still shows and still works. */
+.date-with-readout {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.date-input-masked {
+  color: transparent;
+}
+
+.date-input-masked::-webkit-datetime-edit,
+.date-input-masked::-webkit-datetime-edit-fields-wrapper,
+.date-input-masked::-webkit-datetime-edit-text,
+.date-input-masked::-webkit-datetime-edit-month-field,
+.date-input-masked::-webkit-datetime-edit-day-field,
+.date-input-masked::-webkit-datetime-edit-year-field {
+  color: transparent;
+}
+
+.date-overlay-text {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 13px;
+  color: #1e293b;
+  white-space: nowrap;
+}

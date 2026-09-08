@@ -15,6 +15,7 @@ import {
   faComments,
   faChevronRight,
   faFileExcel,
+  faEnvelope,
   faShieldHalved,
   faUserPlus,
   faUserShield,
@@ -39,6 +40,8 @@ const buildNav = (role) => {
         { label: "Create Lead", path: "/create-lead" },
         { label: "Company Info", path: "/leads" },
         { label: "Companies", path: "/companies" },
+        { label: "Cold Leads", path: "/cold-leads" },
+        { label: "My Leads", path: "/my-cold-leads" },
         ...(canManageTeam(role)
           ? [
               { label: "Unassigned Leads", path: "/unassigned-leads" },
@@ -92,6 +95,7 @@ const buildNav = (role) => {
       path: "/permissions",
     });
     items.push({ key: "audit", label: "Audit", icon: faShieldHalved, path: "/audit" });
+    items.push({ key: "bulk-import", label: "Bulk Import", icon: faFileExcel, path: "/bulk-import" });
     items.push({ key: "downloads", label: "Downloads", icon: faDownload, action: "downloads" });
   }
 
@@ -274,6 +278,19 @@ function SideNav() {
                       }}
                     >
                       <FontAwesomeIcon icon={faFileExcel} /> Users XLSX
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      className="side-nav-subitem"
+                      onClick={(e) => {
+                        e.currentTarget.blur();
+                        navigate("/email-export");
+                        setExpanded(null);
+                      }}
+                    >
+                      <FontAwesomeIcon icon={faEnvelope} /> Email List
                     </button>
                   </li>
                 </ul>

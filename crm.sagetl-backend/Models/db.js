@@ -1,9 +1,9 @@
 require('dotenv').config();
 const { Pool } = require('pg');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const { ROLE_LABELS, ROLES, normalizeRole } = require('../Middleware/roles');
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/crm';
@@ -15,6 +15,127 @@ function inPlaceholders(arr, startIndex = 1) {
   return arr.map((_, i) => `$${startIndex + i}`).join(', ');
 }
 
+// Which physical column (and, for a dotted path, which parallel jsonb-typed
+// path) a MongoDB-style query key maps to. Pulled out of buildWhereClause
+// purely to keep that function's own branching shallow — every line of logic
+// here is unchanged from before, just relocated.
+function resolveWhereColumn(key) {
+  if (key === '_id' || key === 'id') {
+    return { col: 'id', jsonbCol: null };
+  }
+
+  if (key.includes('.')) {
+    const parts = key.split('.');
+    const topCol = parts[0];
+    let mappedCol = '';
+    if (topCol === 'companyInfo') mappedCol = 'company_info';
+    else if (topCol === 'contactInfo') mappedCol = 'contact_info';
+    else if (topCol === 'itLandscape') mappedCol = 'it_landscape';
+    else mappedCol = topCol;
+
+    let jsonPath = mappedCol;
+    let jsonbPath = mappedCol;
+    for (let i = 1; i < parts.length; i++) {
+      const isLast = i === parts.length - 1;
+      jsonbPath += `->'${parts[i]}'`;
+      if (isLast) {
+        jsonPath += `->>'${parts[i]}'`;
+      } else {
+        jsonPath += `->'${parts[i]}'`;
+      }
+    }
+    // A parallel jsonb-typed (not text-cast) path for dotted keys, needed by
+    // $arrayContains: containment only works against actual jsonb, and
+    // ->>'key' text-extraction would compare against the string "[1,2]".
+    return { col: jsonPath, jsonbCol: jsonbPath };
+  }
+
+  if (key === 'supervisor') {
+    // The only column whose name is not just the snake_case of the field.
+    return { col: 'supervisor_id', jsonbCol: null };
+  }
+
+  // Every other column is the snake_case form of the model field
+  // (leadNumber -> lead_number, createdBy -> created_by, ...). Doing this
+  // generically means a field is never passed through as-is and silently
+  // sent to Postgres as an unquoted identifier it will fold to lowercase
+  // and fail to resolve.
+  return { col: key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase(), jsonbCol: null };
+}
+
+// The $in / $nin / $ne / $regex / $arrayContains branch of buildWhereClause,
+// pulled out the same way — takes the current param index, returns the SQL
+// fragment (or null for an operator that matched nothing), the values to
+// bind, and the param index to continue from.
+function buildOperatorCondition(col, jsonbCol, value, paramIndex) {
+  const values = [];
+  let condition = null;
+
+  if (value.$in) {
+    if (value.$in.length === 0) {
+      condition = '1 = 0';
+    } else {
+      const placeholders = value.$in.map(() => `$${paramIndex++}`);
+      condition = `${col} IN (${placeholders.join(', ')})`;
+      values.push(...value.$in.map(v => (v?._id) ? v._id : v));
+    }
+  } else if (value.$nin) {
+    if (value.$nin.length === 0) {
+      condition = '1 = 1';
+    } else {
+      const placeholders = value.$nin.map(() => `$${paramIndex++}`);
+      condition = `${col} NOT IN (${placeholders.join(', ')})`;
+      values.push(...value.$nin.map(v => (v?._id) ? v._id : v));
+    }
+  } else if (value.$ne) {
+    condition = `${col} != $${paramIndex++}`;
+    values.push((value.$ne?._id) ? value.$ne._id : value.$ne);
+  } else if (value.$regex) {
+    condition = `${col} ~* $${paramIndex++}`;
+    values.push(value.$regex);
+  } else if (value.$arrayContains !== undefined) {
+    // Matches whether the stored value is a bare scalar (legacy leads
+    // assigned to one person) or a JSON array (multi-BDM assignment):
+    // jsonb @> treats a scalar right-hand side as "does this array
+    // contain it, or equal it" either way.
+    const ids = Array.isArray(value.$arrayContains)
+      ? value.$arrayContains
+      : [value.$arrayContains];
+    if (ids.length === 0) {
+      condition = '1 = 0';
+    } else {
+      const parts = ids.map((id) => {
+        const idx = paramIndex++;
+        values.push(Number(id));
+        return `COALESCE(${jsonbCol || col}, 'null'::jsonb) @> to_jsonb($${idx}::int)`;
+      });
+      condition = '(' + parts.join(' OR ') + ')';
+    }
+  }
+
+  return { condition, values, paramIndex };
+}
+
+// A top-level $or: [...] — each branch is itself a full sub-query, built
+// with the same buildWhereClause and stitched together with OR.
+function buildOrCondition(subQueries, paramIndex) {
+  const orConditions = [];
+  const values = [];
+  for (const subQuery of subQueries) {
+    const sub = buildWhereClause(subQuery, paramIndex);
+    if (sub.where) {
+      orConditions.push(sub.where.replace('WHERE ', ''));
+      values.push(...sub.values);
+      paramIndex += sub.values.length;
+    }
+  }
+  return {
+    condition: orConditions.length > 0 ? '(' + orConditions.join(' OR ') + ')' : null,
+    values,
+    paramIndex,
+  };
+}
+
 // Helper to convert MongoDB-style queries to PostgreSQL WHERE clauses
 function buildWhereClause(query, startParamIndex = 1) {
   const conditions = [];
@@ -23,106 +144,22 @@ function buildWhereClause(query, startParamIndex = 1) {
 
   for (const [key, value] of Object.entries(query)) {
     if (key === '$or') {
-      const orConditions = [];
-      for (const subQuery of value) {
-        const sub = buildWhereClause(subQuery, paramIndex);
-        if (sub.where) {
-          orConditions.push(sub.where.replace('WHERE ', ''));
-          values.push(...sub.values);
-          paramIndex += sub.values.length;
-        }
-      }
-      if (orConditions.length > 0) {
-        conditions.push('(' + orConditions.join(' OR ') + ')');
-      }
+      const or = buildOrCondition(value, paramIndex);
+      if (or.condition) conditions.push(or.condition);
+      values.push(...or.values);
+      paramIndex = or.paramIndex;
       continue;
     }
 
-    let col = key;
-    // A parallel jsonb-typed (not text-cast) path for dotted keys, needed by
-    // $arrayContains: containment only works against actual jsonb, and
-    // ->>'key' text-extraction would compare against the string "[1,2]".
-    let jsonbCol = null;
-    if (key === '_id' || key === 'id') {
-      col = 'id';
-    } else if (key.includes('.')) {
-      const parts = key.split('.');
-      const topCol = parts[0];
-      let mappedCol = '';
-      if (topCol === 'companyInfo') mappedCol = 'company_info';
-      else if (topCol === 'contactInfo') mappedCol = 'contact_info';
-      else if (topCol === 'itLandscape') mappedCol = 'it_landscape';
-      else mappedCol = topCol;
-
-      let jsonPath = mappedCol;
-      let jsonbPath = mappedCol;
-      for (let i = 1; i < parts.length; i++) {
-        const isLast = i === parts.length - 1;
-        jsonbPath += `->'${parts[i]}'`;
-        if (isLast) {
-          jsonPath += `->>'${parts[i]}'`;
-        } else {
-          jsonPath += `->'${parts[i]}'`;
-        }
-      }
-      col = jsonPath;
-      jsonbCol = jsonbPath;
-    } else if (col === 'supervisor') {
-      // The only column whose name is not just the snake_case of the field.
-      col = 'supervisor_id';
-    } else {
-      // Every other column is the snake_case form of the model field
-      // (leadNumber -> lead_number, createdBy -> created_by, ...). Doing this
-      // generically means a field is never passed through as-is and silently
-      // sent to Postgres as an unquoted identifier it will fold to lowercase
-      // and fail to resolve.
-      col = col.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
-    }
+    const { col, jsonbCol } = resolveWhereColumn(key);
 
     if (value === null || value === undefined) {
       conditions.push(`${col} IS NULL`);
     } else if (typeof value === 'object' && value !== null && !(value instanceof Date)) {
-      if (value.$in) {
-        if (value.$in.length === 0) {
-          conditions.push('1 = 0');
-        } else {
-          const placeholders = value.$in.map(() => `$${paramIndex++}`);
-          conditions.push(`${col} IN (${placeholders.join(', ')})`);
-          values.push(...value.$in.map(v => (v && v._id) ? v._id : v));
-        }
-      } else if (value.$nin) {
-        if (value.$nin.length === 0) {
-          conditions.push('1 = 1');
-        } else {
-          const placeholders = value.$nin.map(() => `$${paramIndex++}`);
-          conditions.push(`${col} NOT IN (${placeholders.join(', ')})`);
-          values.push(...value.$nin.map(v => (v && v._id) ? v._id : v));
-        }
-      } else if (value.$ne) {
-        conditions.push(`${col} != $${paramIndex++}`);
-        values.push((value.$ne && value.$ne._id) ? value.$ne._id : value.$ne);
-      } else if (value.$regex) {
-        conditions.push(`${col} ~* $${paramIndex++}`);
-        values.push(value.$regex);
-      } else if (value.$arrayContains !== undefined) {
-        // Matches whether the stored value is a bare scalar (legacy leads
-        // assigned to one person) or a JSON array (multi-BDM assignment):
-        // jsonb @> treats a scalar right-hand side as "does this array
-        // contain it, or equal it" either way.
-        const ids = Array.isArray(value.$arrayContains)
-          ? value.$arrayContains
-          : [value.$arrayContains];
-        if (ids.length === 0) {
-          conditions.push('1 = 0');
-        } else {
-          const parts = ids.map((id) => {
-            const idx = paramIndex++;
-            values.push(Number(id));
-            return `COALESCE(${jsonbCol || col}, 'null'::jsonb) @> to_jsonb($${idx}::int)`;
-          });
-          conditions.push('(' + parts.join(' OR ') + ')');
-        }
-      }
+      const op = buildOperatorCondition(col, jsonbCol, value, paramIndex);
+      if (op.condition) conditions.push(op.condition);
+      values.push(...op.values);
+      paramIndex = op.paramIndex;
     } else {
       const finalVal = (value && typeof value === 'object' && value._id) ? value._id : value;
       conditions.push(`${col} = $${paramIndex++}`);
@@ -228,7 +265,8 @@ class UserModelInstance {
       return this;
     } else {
       const placeholders = keys.map((_, idx) => `$${idx + 1}`).join(', ');
-      const query = `INSERT INTO users (${keys.map(k => `"${k}"`).join(', ')}) VALUES (${placeholders}) RETURNING *`;
+      const quotedKeys = keys.map(k => `"${k}"`).join(', ');
+      const query = `INSERT INTO users (${quotedKeys}) VALUES (${placeholders}) RETURNING *`;
       const res = await pool.query(query, values);
       Object.assign(this, mapUser(res.rows[0]));
       return this;
@@ -267,7 +305,7 @@ function buildLeadUpdate(update) {
     // Path segments are interpolated into SQL, so accept only plain
     // identifiers — these come from server code, never from a request body.
     if (!column || rest.length === 0) continue;
-    if (!rest.every((part) => /^[A-Za-z0-9_]+$/.test(part))) continue;
+    if (!rest.every((part) => /^\w+$/.test(part))) continue;
 
     values.push(JSON.stringify(value === undefined ? null : value));
     sets.push(
@@ -298,7 +336,8 @@ class LeadModelInstance {
       return this;
     } else {
       const placeholders = keys.map((_, idx) => `$${idx + 1}`).join(', ');
-      const query = `INSERT INTO leads (${keys.map(k => `"${k}"`).join(', ')}) VALUES (${placeholders}) RETURNING *`;
+      const quotedKeys = keys.map(k => `"${k}"`).join(', ');
+      const query = `INSERT INTO leads (${quotedKeys}) VALUES (${placeholders}) RETURNING *`;
       const res = await pool.query(query, values);
       Object.assign(this, mapLead(res.rows[0]));
       return this;
@@ -335,7 +374,7 @@ class OptionsModelInstance {
   }
   async save() {
     const countRes = await pool.query('SELECT COUNT(*) FROM options');
-    if (parseInt(countRes.rows[0].count, 10) > 0) {
+    if (Number.parseInt(countRes.rows[0].count, 10) > 0) {
       const res = await pool.query('UPDATE options SET data = $1 RETURNING *', [this.data]);
       this.data = res.rows[0].data;
       return this;
@@ -347,9 +386,33 @@ class OptionsModelInstance {
   }
 }
 
+// Resolves each user's `supervisor` id into the (public-shaped) supervisor
+// record in place — the User.find().populate('supervisor') behaviour.
+async function populateSupervisors(items) {
+  const supervisorIds = [...new Set(items.map(u => u.supervisor).filter(Boolean))];
+  if (supervisorIds.length === 0) return;
+  const supRes = await pool.query(`SELECT * FROM users WHERE id IN (${inPlaceholders(supervisorIds)})`, supervisorIds);
+  const supMap = {};
+  supRes.rows.map(mapPublicUser).forEach(s => {
+    supMap[s.id] = s;
+  });
+  items.forEach(u => {
+    if (u.supervisor) {
+      u.supervisor = supMap[u.supervisor] || null;
+    }
+  });
+}
+
 // User Model query helpers
 const User = {
   find: function(query, projection) {
+    // Whether to keep the password hash on a returned row — only when the
+    // caller explicitly asked for it via an inclusion projection. Pulled out
+    // of the query builder below purely to keep exec()'s own branching
+    // shallow.
+    const wantsPassword = () =>
+      projection && (projection.password === 1 || projection.password === true);
+
     let queryBuilder = {
       populate: function(path, select) {
         this._populates.push({ path, select });
@@ -385,35 +448,17 @@ const User = {
           sql += ` LIMIT ${this._limit}`;
         }
         const res = await pool.query(sql, values);
+        // Exclude the password hash unless a caller explicitly asks for it.
+        // An inclusion projection like { firstName: 1, role: 1 } previously
+        // fell through this check and shipped the hash to the browser.
         let items = res.rows.map(mapUser).map(u => {
           const inst = new UserModelInstance(u);
-          // Exclude the password hash unless a caller explicitly asks for it.
-          // An inclusion projection like { firstName: 1, role: 1 } previously
-          // fell through this check and shipped the hash to the browser.
-          const wantsPassword =
-            projection && (projection.password === 1 || projection.password === true);
-          if (!wantsPassword) {
-            delete inst.password;
-          }
+          if (!wantsPassword()) delete inst.password;
           return inst;
         });
-        
-        for (const pop of this._populates) {
-          if (pop.path === 'supervisor') {
-            const supervisorIds = [...new Set(items.map(u => u.supervisor).filter(Boolean))];
-            if (supervisorIds.length > 0) {
-              const supRes = await pool.query(`SELECT * FROM users WHERE id IN (${inPlaceholders(supervisorIds)})`, supervisorIds);
-              const supMap = {};
-              supRes.rows.map(mapPublicUser).forEach(s => {
-                supMap[s.id] = s;
-              });
-              items.forEach(u => {
-                if (u.supervisor) {
-                  u.supervisor = supMap[u.supervisor] || null;
-                }
-              });
-            }
-          }
+
+        if (this._populates.some((pop) => pop.path === 'supervisor')) {
+          await populateSupervisors(items);
         }
         return items;
       }
@@ -453,7 +498,7 @@ const User = {
     const { where, values } = buildWhereClause(query || {});
     const sql = `SELECT COUNT(*) FROM users ${where}`;
     const res = await pool.query(sql, values);
-    return parseInt(res.rows[0].count, 10);
+    return Number.parseInt(res.rows[0].count, 10);
   }
 };
 
@@ -513,9 +558,12 @@ const Lead = {
             // A lead may be assigned to one BDM (legacy: a bare id) or several
             // (an array of ids). Either shape is normalised to an id list here
             // and written back in the same shape it was read in.
-            const asIdList = (v) => (Array.isArray(v) ? v : v !== null && v !== undefined ? [v] : []);
+            const asIdList = (v) => {
+              if (Array.isArray(v)) return v;
+              return v !== null && v !== undefined ? [v] : [];
+            };
             const userIds = [...new Set(
-              items.flatMap(l => asIdList(l.companyInfo.leadAssignedTo)).filter(id => id && !isNaN(id))
+              items.flatMap(l => asIdList(l.companyInfo.leadAssignedTo)).filter(id => id && !Number.isNaN(Number(id)))
             )];
             if (userIds.length > 0) {
               const uRes = await pool.query(`SELECT * FROM users WHERE id IN (${inPlaceholders(userIds)})`, userIds);
@@ -689,7 +737,8 @@ class TaskModelInstance {
       return this;
     } else {
       const placeholders = keys.map((_, idx) => `$${idx + 1}`).join(', ');
-      const query = `INSERT INTO tasks (${keys.map(k => `"${k}"`).join(', ')}) VALUES (${placeholders}) RETURNING *`;
+      const quotedKeys = keys.map(k => `"${k}"`).join(', ');
+      const query = `INSERT INTO tasks (${quotedKeys}) VALUES (${placeholders}) RETURNING *`;
       const res = await pool.query(query, values);
       Object.assign(this, mapTask(res.rows[0]));
       return this;
@@ -733,9 +782,10 @@ const Task = {
         let conditions = [];
         let values = [];
         let pIndex = 1;
-        if (query && query.user_id) {
+        if (query?.user_id) {
           if (query.user_id.$in) {
-            conditions.push(`user_id IN (${query.user_id.$in.map(() => `$${pIndex++}`).join(', ')})`);
+            const idPlaceholders = query.user_id.$in.map(() => `$${pIndex++}`).join(', ');
+            conditions.push(`user_id IN (${idPlaceholders})`);
             values.push(...query.user_id.$in);
           } else {
             conditions.push(`user_id = $${pIndex++}`);
@@ -755,11 +805,11 @@ const Task = {
     let conditions = [];
     let values = [];
     let pIndex = 1;
-    if (query && query.taskId) {
+    if (query?.taskId) {
       conditions.push(`task_id = $${pIndex++}`);
       values.push(query.taskId);
     }
-    if (query && query.id) {
+    if (query?.id) {
       conditions.push(`id = $${pIndex++}`);
       values.push(Number(query.id));
     }
@@ -798,7 +848,7 @@ const OptionsModel = {
 // password in the repository.
 function resolveSeedPassword(envVar) {
   const fromEnv = process.env[envVar];
-  if (fromEnv && fromEnv.trim()) {
+  if (fromEnv?.trim()) {
     return { password: fromEnv.trim(), generated: false };
   }
   // 18 bytes -> 24 base64url chars.
@@ -830,7 +880,7 @@ async function getDescendantUserIds(userId) {
 // Startup table creation & user seeding
 async function initializeDB() {
   const baseUri = connectionString.replace(/\/([^/]+)$/, '/postgres');
-  const dbName = connectionString.match(/\/([^/]+)$/)?.[1] || 'crm';
+  const dbName = /\/([^/]+)$/.exec(connectionString)?.[1] || 'crm';
   
   console.log(`Checking if database '${dbName}' exists...`);
   const setupPool = new Pool({ connectionString: baseUri });
@@ -891,6 +941,59 @@ async function initializeDB() {
       );
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);`);
+
+    // Cold-lead pool: leads are pulled in a fixed batch of up to 100 at a
+    // time (grouped by batch_id), not for a chosen number of days. A pull is
+    // "resolved" once either the lead is converted (its own leadStatus moves
+    // off Cold) or the puller explicitly returns it with a note explaining
+    // what they did — returned_at/return_note record that. Nothing expires
+    // on a timer any more; a lead is available again the moment its one
+    // active (unreturned, still-Cold) pull is resolved. Old rows are never
+    // deleted, so history and "is this currently pulled" both read off the
+    // same table.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cold_lead_pulls (
+        id SERIAL PRIMARY KEY,
+        lead_number INT NOT NULL,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        tenure_days INT,
+        pulled_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_cold_pulls_lead ON cold_lead_pulls(lead_number, expires_at);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_cold_pulls_user ON cold_lead_pulls(user_id, expires_at);`);
+    // Groups the rows from one bulk pull together, so "everything I pulled in
+    // this batch" can be told apart from an earlier or later one. Plain text,
+    // not a UUID column, so it needs no extension.
+    await pool.query(`ALTER TABLE cold_lead_pulls ADD COLUMN IF NOT EXISTS batch_id TEXT;`);
+    // Tenure is retired — the batch system replaced it. Old rows keep
+    // whatever values they already have (history), but neither column is
+    // required for a new pull any more.
+    await pool.query(`ALTER TABLE cold_lead_pulls ALTER COLUMN tenure_days DROP NOT NULL;`);
+    await pool.query(`ALTER TABLE cold_lead_pulls DROP CONSTRAINT IF EXISTS cold_lead_pulls_tenure_days_check;`);
+    await pool.query(`ALTER TABLE cold_lead_pulls ALTER COLUMN expires_at DROP NOT NULL;`);
+    // Set once a pull is explicitly returned to the pool, always together
+    // with the note explaining what action was taken — the two are never
+    // set independently of each other.
+    await pool.query(`ALTER TABLE cold_lead_pulls ADD COLUMN IF NOT EXISTS returned_at TIMESTAMP;`);
+    await pool.query(`ALTER TABLE cold_lead_pulls ADD COLUMN IF NOT EXISTS return_note TEXT;`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_cold_pulls_batch ON cold_lead_pulls(batch_id);`);
+
+    // Saved column-mapping choices for Bulk Import, one row per named preset
+    // (e.g. "Vendor X format"). A vendor's file layout tends to repeat, so
+    // the admin maps it once and reuses the preset on every later batch from
+    // that same source instead of remapping from scratch each time.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS import_mapping_presets (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        mapping JSONB NOT NULL DEFAULT '{}'::jsonb,
+        split_rules JSONB NOT NULL DEFAULT '[]'::jsonb,
+        created_by INT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
 
     // Presence samples: one row per heartbeat from an open tab. "active" means
     // the browser saw real mouse/keyboard input recently, which is what
@@ -1155,7 +1258,7 @@ async function initializeDB() {
     console.log("PostgreSQL schema initialized successfully.");
 
     const usersCount = await pool.query('SELECT COUNT(*) FROM users');
-    if (parseInt(usersCount.rows[0].count, 10) === 0) {
+    if (Number.parseInt(usersCount.rows[0].count, 10) === 0) {
       console.log("Seeding default users...");
       const usersData = JSON.parse(fs.readFileSync(path.join(__dirname, "../Users.json"), "utf-8"));
       const emailToId = {};
@@ -1319,7 +1422,14 @@ async function initializeDB() {
       timeframeOptions: ["Immediate", "1-3 months", "3-6 months"],
       currentDatabaseOptions: ["Oracle", "SQL Server", "MySQL", "PostgreSQL"],
       expiryOptions: ["2026", "2027", "2028"],
-      versionOptions: ["v1", "v2"],
+      versionOptions: [
+        "ECC 6.0",
+        "R/3 (legacy)",
+        "S/4HANA – On-Premise",
+        "S/4HANA Cloud, Private Edition (RISE)",
+        "S/4HANA Cloud, Public Edition (GROW)",
+        "Other / Not Sure",
+      ],
       partnerOptions: ["Partner A", "Partner B"],
       conversationLevelOptions: ["C-level", "Manager-level"]
     };
@@ -1380,7 +1490,7 @@ module.exports = {
     }
   },
   isValidObjectId: function(id) {
-    return typeof id === 'number' || (typeof id === 'string' && id.length > 0 && !isNaN(Number(id)));
+    return typeof id === 'number' || (typeof id === 'string' && id.length > 0 && !Number.isNaN(Number(id)));
   },
   User: UserConstructor,
   Lead: LeadConstructor,

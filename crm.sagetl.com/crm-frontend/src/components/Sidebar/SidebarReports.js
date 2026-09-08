@@ -3,18 +3,13 @@ import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFilePdf, faDownload } from "@fortawesome/free-solid-svg-icons";
 import { API_BASE_URL } from "../../config";
+import { formatDate } from "../../dateFormat";
 
 const formatSize = (bytes) => {
   if (!bytes && bytes !== 0) return "";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-const formatDate = (value) => {
-  if (!value) return "";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString();
 };
 
 // Lists the report PDFs that have been generated, newest first. The server

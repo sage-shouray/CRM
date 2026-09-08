@@ -26,6 +26,7 @@ import { handleError, handleSuccess } from "../../utils";
 import "./Profile.css";
 
 import { API_BASE_URL } from "../../config";
+import { formatDate } from "../../dateFormat";
 
 function Profile() {
   const [profileData, setProfileData] = useState(null);
@@ -339,12 +340,8 @@ function Profile() {
               <div className="field-value-box">
                 <FontAwesomeIcon icon={faCalendarAlt} className="field-icon" />
                 <span>
-                  {profileData?.createdAt 
-                    ? new Date(profileData.createdAt).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric"
-                      })
+                  {profileData?.createdAt
+                    ? formatDate(profileData.createdAt)
                     : "Active Member"}
                 </span>
               </div>

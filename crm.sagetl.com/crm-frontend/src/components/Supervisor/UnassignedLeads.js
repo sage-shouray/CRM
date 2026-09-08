@@ -304,6 +304,7 @@ const UnassignedLeads = () => {
           Bulk Assign
         </button>
       </div>
+      <div className="table-scroll-wrapper">
       <table>
         <thead>
           <tr>
@@ -383,6 +384,7 @@ const UnassignedLeads = () => {
           ))}
         </tbody>
       </table>
+      </div>
 
       {/* Show LeadDetails component when a lead is selected */}
       {showLeadDetails && (

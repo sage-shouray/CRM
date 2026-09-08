@@ -5,7 +5,7 @@ const multer = require("multer");
 const mongoose = require("./Models/db");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const http = require("http");
+const http = require("node:http");
 const { Server } = require("socket.io");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
@@ -16,6 +16,7 @@ const User = require("./Models/User");
 const Task = require("./Models/Task");
 
 const { authenticateToken, checkRole, checkUserStatus, invalidateAccountState } = require("./Middleware/auth");
+const { allowedOrigins, isPrivateOrigin, allowLanOrigins } = require("./Middleware/corsOrigins");
 const {
   ROLES,
   ALL_ROLES,
@@ -24,6 +25,30 @@ const {
   canManageTeam,
 } = require("./Middleware/roles");
 const { getDescendantUserIds } = require("./Models/db");
+const { FIELD_CATALOG } = require("./Models/bulkImportFields");
+const {
+  readWorkbook,
+  sheetToRows,
+  detectHeaderRowIndex,
+  autoMapAndSplit,
+  normalizeText,
+  transformRows,
+} = require("./Models/bulkImportTransform");
+
+// Shared by /parse (to show the admin what it guessed) and /auto-import's
+// zero-touch mode (to actually use the guess): the column mapping plus any
+// combined-column split rules, worked out purely from the file itself — no
+// admin input required for a normally-shaped file.
+function computeAutoMapping(rows, headerRowIndex) {
+  const headers = (rows[headerRowIndex] || []).map((h) => normalizeText(h)).filter(Boolean);
+  const dataRows = rows.slice(headerRowIndex + 1, headerRowIndex + 41); // wide enough sample to classify columns confidently
+  const sampleValuesByHeader = {};
+  headers.forEach((h, idx) => {
+    sampleValuesByHeader[h] = dataRows.map((r) => r[idx]);
+  });
+  const { mapping, splitRules } = autoMapAndSplit(headers, sampleValuesByHeader);
+  return { headers, mapping, splitRules };
+}
 const { validate, createUserSchema, updateUserSchema, taskSchema } = require("./Middleware/validation");
 const AuthRouter = require("./Routes/AuthRouter");
 const OptionsRouter = require("./Routes/OptionsRouter");
@@ -64,30 +89,10 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
-// Allowed CORS origins: comma-separated CORS_ORIGINS env, or sensible dev defaults.
-const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:3000")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
-
-// Private-network addresses: 10.x, 172.16–31.x, 192.168.x, plus loopback.
-//
-// The machine's LAN address is handed out by DHCP and changes on its own — it
-// moved from .192 to .196 without anyone touching a setting, which silently
-// broke every device on the Wi-Fi because the old address was pinned in
-// CORS_ORIGINS. Matching the private ranges by shape keeps LAN access working
-// across those reassignments instead of failing until someone edits .env.
-//
-// Only private addresses qualify: a request from a public origin is still
-// refused. Set ALLOW_LAN_ORIGINS=false to require the explicit list instead.
-const PRIVATE_ORIGIN = /^https?:\/\/(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
-
-const allowLanOrigins = (process.env.ALLOW_LAN_ORIGINS || "true").trim() !== "false";
-
 const corsOrigin = (origin, callback) => {
   // Allow non-browser clients (no Origin header) and any whitelisted origin.
-  if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-  if (allowLanOrigins && PRIVATE_ORIGIN.test(origin)) return callback(null, true);
+  if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+  if (allowLanOrigins && isPrivateOrigin(origin)) return callback(null, true);
   return callback(new Error(`Origin ${origin} not allowed by CORS`));
 };
 
@@ -199,8 +204,11 @@ app.use(
 // development so nobody ships the weak value by accident.
 const JWT_SECRET_MIN = 32;
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < JWT_SECRET_MIN) {
+  const jwtSecretState = process.env.JWT_SECRET
+    ? `only ${process.env.JWT_SECRET.length} characters`
+    : "not set";
   const message =
-    `JWT_SECRET is ${process.env.JWT_SECRET ? `only ${process.env.JWT_SECRET.length} characters` : "not set"}. ` +
+    `JWT_SECRET is ${jwtSecretState}. ` +
     `It must be at least ${JWT_SECRET_MIN}. Generate one with:\n` +
     `  node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`;
 
@@ -231,9 +239,14 @@ app.set("trust proxy", 1);
 app.use(bodyParser.json({ limit: "1mb" }));
 app.use(bodyParser.urlencoded({ limit: "1mb", extended: true }));
 
-// File upload configuration
+// File upload configuration.
+// Only one attachment endpoint uses this (the optional file on lead
+// creation), and multer buffers the whole upload into process memory by
+// default (no disk/S3 storage configured) — several concurrent uploads near
+// a 50MB cap could spike RAM well past what this server has. 10MB comfortably
+// covers a PDF/doc/image attachment while keeping that worst case bounded.
 const upload = multer({
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
 
 // Rate limiter for authentication endpoints (brute-force / abuse protection)
@@ -273,6 +286,20 @@ app.use("/api", WorkReportRoutes);
 // The set of user ids whose records the caller may see.
 //
 // Returns null for Super Admin, meaning "no restriction". Everyone else is
+// "$1, $2, $3..." for a parameterised IN (...) clause — pulled out to one
+// place since three different report routes were each building this with
+// their own nested template literal.
+const placeholderList = (arr) => arr.map((_, i) => `$${i + 1}`).join(", ");
+
+// A jsonb array column (read_by, members) comes back from `pg` already
+// parsed most of the time, but occasionally as its raw JSON text — this
+// covers both without a nested ternary at every call site.
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") return JSON.parse(value);
+  return [];
+}
+
 // scoped to their own branch of the reporting tree, so the same helper covers
 // all four tiers:
 //   Super Admin    -> unrestricted
@@ -303,27 +330,19 @@ async function visibleUserIds(user) {
   return ids;
 }
 
-// Leads are readable by every signed-in user: the company list is shared
-// knowledge, and being able to see who is already working an account is what
-// stops two people cold-calling it. Editing is what stays restricted — see
-// userCanEditLead below.
-
-// Whether a user may CHANGE a given lead.
-//
-// Allowed: an Admin (unrestricted), the person who created the lead, and any
-// manager above that creator in the reporting tree. Everyone else may read the
-// record but not alter it.
-//
-// visibleUserIds returns the caller's own branch of the tree — themselves plus
-// everyone beneath them — so "is the creator inside my branch?" answers both
-// the self case and the manager case at once.
+// Leads are readable AND editable by every signed-in user, whatever their
+// role or place in the reporting tree — an Executive, a Manager, and an
+// Admin all get the same edit rights on any company. This used to be
+// restricted to the creator, their manager chain, or the assignee, but that
+// blocked people from updating a lead they legitimately needed to work on
+// (covering for a colleague, correcting a record they spotted was wrong,
+// etc.) whenever they didn't happen to fit one of those three roles.
+// The only permission that still exists on a lead is *who can see it at
+// all* — nobody; every lead is visible to every signed-in user regardless —
+// so this function only remains as a named, single place every edit route
+// checks, in case a narrower rule is ever wanted again later.
 async function userCanEditLead(user, lead) {
-  const ids = await visibleUserIds(user);
-  if (ids === null) return true; // Admin
-
-  const creatorId = Number(lead.createdBy?._id ?? lead.createdBy);
-  if (!Number.isFinite(creatorId)) return false;
-  return ids.includes(creatorId);
+  return true;
 }
 
 // Let an assignee know work has landed on them: a live socket event for anyone
@@ -334,7 +353,7 @@ async function userCanEditLead(user, lead) {
 // escape them so one can't plant a link or markup that reads as an official
 // CRM notification to whoever receives it.
 const escapeHtml = (value) =>
-  String(value ?? "").replace(/[&<>"']/g, (c) => (
+  String(value ?? "").replaceAll(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
   ));
 
@@ -356,6 +375,10 @@ async function notifyTaskAssigned(task, assigner) {
 
   if (!process.env.EMAIL_USER || !assignee.email) return;
   try {
+    const leadLine = task.associatedLead
+      ? `<li><strong>Lead:</strong> ${escapeHtml(task.associatedLead)}</li>`
+      : "";
+    const descriptionLine = task.description ? `<p>${escapeHtml(task.description)}</p>` : "";
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: assignee.email,
@@ -367,9 +390,9 @@ async function notifyTaskAssigned(task, assigner) {
           <li><strong>Task:</strong> ${escapeHtml(task.title)}</li>
           <li><strong>Due:</strong> ${escapeHtml(task.dueDate) || "no date set"}</li>
           <li><strong>Priority:</strong> ${escapeHtml(task.priority) || "Medium"}</li>
-          ${task.associatedLead ? `<li><strong>Lead:</strong> ${escapeHtml(task.associatedLead)}</li>` : ""}
+          ${leadLine}
         </ul>
-        ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
+        ${descriptionLine}
       `,
     });
   } catch (err) {
@@ -377,14 +400,15 @@ async function notifyTaskAssigned(task, assigner) {
   }
 }
 
-// Whether a user may view/change a given task. Same scope rule as everything
-// else: your own, or someone below you in the reporting tree.
+// Whether a user may view/change a given task. Deliberately narrower than the
+// reporting-tree scope used elsewhere: a to-do is private between whoever it
+// belongs to and whoever assigned it, not visible to a manager's whole team
+// or to every Admin by default just because they outrank the owner.
 async function userCanAccessTask(user, task) {
-  const ids = await visibleUserIds(user);
-  if (ids === null) return true;
+  const callerId = Number(user?._id ?? user?.id);
   const ownerId = Number(task?.userId ?? task?.user_id);
-  if (!Number.isFinite(ownerId)) return false;
-  return ids.includes(ownerId);
+  const assignerId = Number(task?.assignedBy ?? task?.assigned_by);
+  return callerId === ownerId || (Number.isFinite(assignerId) && callerId === assignerId);
 }
 
 // Whether a user may see another user's profile. Everyone may read their own.
@@ -450,7 +474,9 @@ app.post("/api/leads", authenticateToken, upload.single("file"), async (req, res
         // their own "assigned leads" list.
         leadAssignedTo: (() => {
           const raw = parsedData.company?.leadAssignedTo;
-          const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+          let list = [];
+          if (Array.isArray(raw)) list = raw;
+          else if (raw) list = [raw];
           const ids = [...new Set(list.map(Number).filter(Number.isFinite))];
           return ids.length ? ids : null;
         })(),
@@ -502,6 +528,13 @@ app.post("/api/leads", authenticateToken, upload.single("file"), async (req, res
           email: parsedData.contact?.businessHeadEmail,
           personalEmail: parsedData.contact?.businessHeadPersonalEmail,
         },
+        // Extra contacts beyond the three fixed roles (IT / Finance / Business
+        // Head) — "Procurement Head", "CTO", however many the form added. Kept
+        // as-is; each entry is already { sectionTitle, name, dlExt,
+        // designation, mobile, email, personalEmail } from the client.
+        additional: Array.isArray(parsedData.additionalSections)
+          ? parsedData.additionalSections
+          : [],
       },
       itLandscape: {
         netNew: parsedData.itLandscape?.netNew || {},
@@ -516,6 +549,11 @@ app.post("/api/leads", authenticateToken, upload.single("file"), async (req, res
           // Every later description carries a timestamp; without one here the
           // first note on a lead is undateable in the activity report.
           createdAt: new Date().toISOString(),
+          // Marks this one entry as the lead's own description (written at
+          // creation), so the UI can keep it separate from every later
+          // activity note — everything pushed after this always defaults to
+          // no `type`, i.e. a plain activity entry.
+          type: "description",
         },
       ],
       createdBy: parsedData.createdBy ? Number(parsedData.createdBy) : null,
@@ -681,11 +719,11 @@ app.get(
 // Company names are compared on a normalised form so that "Tata  Steel ",
 // "tata steel" and "Tata Steel" all count as the same company.
 const normalizeCompanyName = (name) =>
-  (name || "").toString().toLowerCase().replace(/\s+/g, " ").trim();
+  (name || "").toString().toLowerCase().replaceAll(/\s+/g, " ").trim();
 
 // SQL for the same normalisation, so the index-free comparison matches JS.
 const NORMALIZED_NAME_SQL =
-  `lower(btrim(regexp_replace(company_info->>'companyName', '\\s+', ' ', 'g')))`;
+  String.raw`lower(btrim(regexp_replace(company_info->>'companyName', '\s+', ' ', 'g')))`;
 
 // Look up an existing lead whose company name matches exactly (normalised).
 const findLeadByCompanyName = async (name) => {
@@ -719,7 +757,7 @@ app.get("/api/leads/company-search", authenticateToken, async (req, res) => {
     // "tata  motors" still surfaces "Tata Motors Ltd" instead of silently
     // finding nothing and then being rejected on submit.
     // Escape LIKE metacharacters so a user typing "%" searches for a literal %.
-    const escaped = target.replace(/[\\%_]/g, (c) => `\\${c}`);
+    const escaped = target.replaceAll(/[\\%_]/g, (c) => `\\${c}`);
 
     const result = await mongoose.pool.query(
       `SELECT l.lead_number,
@@ -747,6 +785,966 @@ app.get("/api/leads/company-search", authenticateToken, async (req, res) => {
   }
 });
 
+// Type-ahead for finding a lead by a contact PERSON's name rather than the
+// company name — the same person can be remembered by name long after which
+// account they sit under is forgotten. Searches every contact slot (IT,
+// Finance, Business Head, and any additional sections) across every lead,
+// and reports whether that particular contact is still marked active there.
+// Deliberately unscoped, like company-search: knowing a contact already
+// exists somewhere is exactly what stops two people cold-calling the same
+// person under two different leads.
+app.get("/api/contacts/search", authenticateToken, async (req, res) => {
+  try {
+    const term = String(req.query.q || "").trim();
+    if (term.length < 2) return res.json([]);
+    const like = `%${term}%`;
+
+    const result = await mongoose.pool.query(
+      `
+      SELECT lead_number, company_name, city, role_key, person_name, designation, active
+        FROM (
+          SELECT l.lead_number, l.company_info->>'companyName' AS company_name,
+                 l.company_info->>'city' AS city, 'IT' AS role_key,
+                 l.contact_info->'it'->>'name' AS person_name,
+                 l.contact_info->'it'->>'designation' AS designation,
+                 COALESCE((l.contact_info->'it'->>'active')::boolean, true) AS active
+            FROM leads l
+           WHERE l.contact_info->'it'->>'name' ILIKE $1
+          UNION ALL
+          SELECT l.lead_number, l.company_info->>'companyName',
+                 l.company_info->>'city', 'Finance',
+                 l.contact_info->'finance'->>'name',
+                 l.contact_info->'finance'->>'designation',
+                 COALESCE((l.contact_info->'finance'->>'active')::boolean, true)
+            FROM leads l
+           WHERE l.contact_info->'finance'->>'name' ILIKE $1
+          UNION ALL
+          SELECT l.lead_number, l.company_info->>'companyName',
+                 l.company_info->>'city', 'Business Head',
+                 l.contact_info->'businessHead'->>'name',
+                 l.contact_info->'businessHead'->>'designation',
+                 COALESCE((l.contact_info->'businessHead'->>'active')::boolean, true)
+            FROM leads l
+           WHERE l.contact_info->'businessHead'->>'name' ILIKE $1
+          UNION ALL
+          SELECT l.lead_number, l.company_info->>'companyName',
+                 l.company_info->>'city', COALESCE(elem->>'sectionTitle', 'Other Contact'),
+                 elem->>'name', elem->>'designation',
+                 COALESCE((elem->>'active')::boolean, true)
+            FROM leads l, jsonb_array_elements(COALESCE(l.contact_info->'additional', '[]'::jsonb)) elem
+           WHERE elem->>'name' ILIKE $1
+        ) matches
+       WHERE person_name IS NOT NULL AND person_name <> ''
+       ORDER BY person_name
+       LIMIT 50
+      `,
+      [like]
+    );
+
+    res.json(
+      result.rows.map((r) => ({
+        leadNumber: r.lead_number,
+        companyName: r.company_name,
+        city: r.city,
+        role: r.role_key,
+        personName: r.person_name,
+        designation: r.designation,
+        active: r.active,
+      }))
+    );
+  } catch (error) {
+    console.error("Error searching contacts:", error);
+    res.status(500).json({ error: "Error searching contacts" });
+  }
+});
+
+// Mass-mail contact export — Admin only. Builds the list an admin picks from
+// before sending an announcement/policy-change email to a chunk of the
+// contact base: filterable by vertical, contact category (IT / Finance /
+// Business Head / Other), and active/inactive — each filter accepts several
+// values at once (comma-separated), not just one — returning every matching
+// contact's email so the page can offer them pre-selected with a manual
+// opt-out, and hand back a CSV of whatever's left checked.
+app.get(
+  "/api/contacts/export",
+  authenticateToken,
+  checkRole([ROLES.ADMIN]),
+  async (req, res) => {
+    try {
+      // Comma-separated lists — an empty list means "no filter on this field",
+      // matching every value, same as before a filter was ever applied.
+      const csvList = (raw) => String(raw || "").split(",").map((s) => s.trim()).filter(Boolean);
+      const verticals = csvList(req.query.vertical);
+      const roles = csvList(req.query.role); // subset of IT / Finance / Business Head / Other
+      const statuses = csvList(req.query.status); // subset of active / inactive
+
+      const params = [];
+      const verticalClause = () => {
+        if (verticals.length === 0) return "";
+        params.push(verticals);
+        return ` AND l.company_info->>'vertical' = ANY($${params.length}::text[])`;
+      };
+      const wantsRole = (name) => roles.length === 0 || roles.includes(name);
+
+      const parts = [];
+      if (wantsRole("IT")) {
+        parts.push(`
+          SELECT l.lead_number, l.company_info->>'companyName' AS company_name,
+                 l.company_info->>'vertical' AS vertical, l.company_info->>'city' AS city,
+                 'IT' AS role_key,
+                 l.contact_info->'it'->>'name' AS person_name,
+                 l.contact_info->'it'->>'email' AS email,
+                 l.contact_info->'it'->>'designation' AS designation,
+                 COALESCE((l.contact_info->'it'->>'active')::boolean, true) AS active
+            FROM leads l
+           WHERE l.contact_info->'it'->>'email' IS NOT NULL
+             AND l.contact_info->'it'->>'email' <> ''
+             ${verticalClause()}
+        `);
+      }
+      if (wantsRole("Finance")) {
+        parts.push(`
+          SELECT l.lead_number, l.company_info->>'companyName',
+                 l.company_info->>'vertical', l.company_info->>'city', 'Finance',
+                 l.contact_info->'finance'->>'name',
+                 l.contact_info->'finance'->>'email',
+                 l.contact_info->'finance'->>'designation',
+                 COALESCE((l.contact_info->'finance'->>'active')::boolean, true)
+            FROM leads l
+           WHERE l.contact_info->'finance'->>'email' IS NOT NULL
+             AND l.contact_info->'finance'->>'email' <> ''
+             ${verticalClause()}
+        `);
+      }
+      if (wantsRole("Business Head")) {
+        parts.push(`
+          SELECT l.lead_number, l.company_info->>'companyName',
+                 l.company_info->>'vertical', l.company_info->>'city', 'Business Head',
+                 l.contact_info->'businessHead'->>'name',
+                 l.contact_info->'businessHead'->>'email',
+                 l.contact_info->'businessHead'->>'designation',
+                 COALESCE((l.contact_info->'businessHead'->>'active')::boolean, true)
+            FROM leads l
+           WHERE l.contact_info->'businessHead'->>'email' IS NOT NULL
+             AND l.contact_info->'businessHead'->>'email' <> ''
+             ${verticalClause()}
+        `);
+      }
+      if (wantsRole("Other")) {
+        parts.push(`
+          SELECT l.lead_number, l.company_info->>'companyName',
+                 l.company_info->>'vertical', l.company_info->>'city',
+                 COALESCE(elem->>'sectionTitle', 'Other Contact'),
+                 elem->>'name', elem->>'email', elem->>'designation',
+                 COALESCE((elem->>'active')::boolean, true)
+            FROM leads l, jsonb_array_elements(COALESCE(l.contact_info->'additional', '[]'::jsonb)) elem
+           WHERE elem->>'email' IS NOT NULL AND elem->>'email' <> ''
+             ${verticalClause()}
+        `);
+      }
+
+      if (parts.length === 0) return res.json([]);
+
+      // Both, or neither, selected means no filter — only a single value
+      // picked out of the two actually narrows it.
+      let statusClause = "";
+      if (statuses.length === 1 && statuses[0] === "active") statusClause = "WHERE active = true";
+      else if (statuses.length === 1 && statuses[0] === "inactive") statusClause = "WHERE active = false";
+
+      const sql = `
+        SELECT lead_number, company_name, vertical, city, role_key, person_name, email, designation, active
+          FROM (${parts.join(" UNION ALL ")}) matches (
+            lead_number, company_name, vertical, city, role_key, person_name, email, designation, active
+          )
+          ${statusClause}
+         ORDER BY company_name, role_key
+         LIMIT 10000
+      `;
+
+      const result = await mongoose.pool.query(sql, params);
+
+      res.json(
+        result.rows.map((r) => ({
+          leadNumber: r.lead_number,
+          companyName: r.company_name,
+          vertical: r.vertical,
+          city: r.city,
+          role: r.role_key,
+          personName: r.person_name,
+          email: r.email,
+          designation: r.designation,
+          active: r.active,
+        }))
+      );
+    } catch (error) {
+      console.error("Error building contact export:", error);
+      res.status(500).json({ error: "Error building contact export" });
+    }
+  }
+);
+
+// --- Cold lead pool ----------------------------------------------------
+// A Cold lead sits in a shared pool anyone can pull from. Pulling always
+// claims a fixed batch — up to 100 leads at once, chosen by whatever filters
+// are applied, not one at a time. A pull is "resolved" once either the lead
+// is converted (its own status moves off Cold) or the puller explicitly
+// returns it with a note saying what they did. A lead is available to
+// anyone the moment its one active pull is resolved — nothing expires on a
+// timer. Pulling a new batch is blocked until every lead in the caller's
+// current batch is resolved, so a pool of leads can never sit half-worked
+// while someone moves on to more.
+const COLD_STATUS = "Cold (9+ months)";
+const COLD_BATCH_SIZE = 100;
+
+// Shared WHERE fragment: is this lead currently unclaimed? True unless some
+// pull row for it has no returned_at yet (an unresolved pull is always for a
+// lead that is still Cold, since conversion or return is what resolves one).
+const COLD_AVAILABLE_SQL = `NOT EXISTS (
+  SELECT 1 FROM cold_lead_pulls p
+   WHERE p.lead_number = l.lead_number AND p.returned_at IS NULL
+)`;
+
+// Builds the optional vertical / city / "no note between these dates"
+// filters shared by the pool listing and the pull-100 action, so the two can
+// never quietly drift apart. dateField values come in as YYYY-MM-DD strings.
+function buildColdFilterSql(query, params) {
+  let sql = "";
+  if (query.vertical) {
+    params.push(query.vertical);
+    sql += ` AND l.company_info->>'vertical' = $${params.length}`;
+  }
+  if (query.city) {
+    params.push(query.city);
+    sql += ` AND l.company_info->>'city' = $${params.length}`;
+  }
+  // "No note between these dates" — companies nobody logged any action
+  // against in that window, the ones going stale. An empty descriptions
+  // array trivially has none, so a lead with zero notes ever always matches.
+  if (query.noNoteFrom && query.noNoteTo) {
+    params.push(query.noNoteFrom, query.noNoteTo);
+    const fromIdx = params.length - 1;
+    const toIdx = params.length;
+    sql += ` AND NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements(l.descriptions) d
+       WHERE (d->>'createdAt') IS NOT NULL
+         AND (d->>'createdAt')::date BETWEEN $${fromIdx}::date AND $${toIdx}::date
+    )`;
+  }
+  // "Freshly Pulled Leads Only" — genuinely untouched, never claimed by
+  // anyone before. Distinct from "available" (COLD_AVAILABLE_SQL already
+  // guarantees that): this excludes leads with any pull history at all, not
+  // just ones currently claimed.
+  if (query.freshOnly === true || query.freshOnly === "true") {
+    sql += ` AND NOT EXISTS (
+      SELECT 1 FROM cold_lead_pulls p3 WHERE p3.lead_number = l.lead_number
+    )`;
+  }
+  return sql;
+}
+
+// Every available Cold lead matching the given filters, plus who pulled it
+// last and their most recent note (for the hover tooltip), and how many
+// times it has ever been pulled (0 means genuinely untouched).
+app.get("/api/cold-leads", authenticateToken, async (req, res) => {
+  try {
+    const params = [COLD_STATUS];
+    const filterSql = buildColdFilterSql(req.query, params);
+
+    const result = await mongoose.pool.query(
+      `SELECT l.lead_number, l.company_info, l.created_at,
+              (SELECT COUNT(*) FROM cold_lead_pulls p WHERE p.lead_number = l.lead_number)::int AS pull_count,
+              lp.user_id AS last_puller_id, lp.pulled_at AS last_pulled_at,
+              lu.first_name AS last_puller_first_name, lu.last_name AS last_puller_last_name,
+              ld.note AS last_note, ld.note_at AS last_note_at
+         FROM leads l
+         LEFT JOIN LATERAL (
+           SELECT user_id, pulled_at FROM cold_lead_pulls p2
+            WHERE p2.lead_number = l.lead_number
+            ORDER BY p2.pulled_at DESC LIMIT 1
+         ) lp ON true
+         LEFT JOIN users lu ON lu.id = lp.user_id
+         LEFT JOIN LATERAL (
+           SELECT d->>'description' AS note, (d->>'createdAt')::timestamptz AS note_at
+             FROM jsonb_array_elements(l.descriptions) d
+            WHERE d->>'createdAt' IS NOT NULL
+              -- The lead's own write-up from when it was created is not an
+              -- action taken on it — excluding it here keeps this in step
+              -- with how the Activity panel on the lead itself treats it.
+              AND COALESCE(d->>'type', '') <> 'description'
+            ORDER BY (d->>'createdAt')::timestamptz DESC LIMIT 1
+         ) ld ON true
+        WHERE l.company_info->>'leadStatus' = $1
+          AND ${COLD_AVAILABLE_SQL}
+          ${filterSql}
+        ORDER BY l.lead_number ASC`,
+      params
+    );
+    res.json(
+      result.rows.map((r) => ({
+        leadNumber: r.lead_number,
+        companyName: r.company_info?.companyName || null,
+        vertical: r.company_info?.vertical || null,
+        city: r.company_info?.city || null,
+        priority: r.company_info?.priority || null,
+        createdAt: r.created_at,
+        pullCount: r.pull_count,
+        neverPulled: r.pull_count === 0,
+        lastPulledAt: r.last_pulled_at,
+        lastPulledByName:
+          [r.last_puller_first_name, r.last_puller_last_name].filter(Boolean).join(" ") || null,
+        lastNote: r.last_note || null,
+        lastNoteAt: r.last_note_at,
+      }))
+    );
+  } catch (error) {
+    console.error("Error listing cold leads:", error);
+    res.status(500).json({ error: "Error listing cold leads" });
+  }
+});
+
+// The caller's current batch (their most recently pulled one), every lead in
+// it with its resolution state, and the summary counts the dashboard shows:
+// how many converted Hot/Warm, how many were returned Cold-with-a-note, and
+// how many are still sitting unresolved with no note at all — the number
+// that has to hit zero before another batch can be pulled.
+app.get("/api/cold-leads/my-leads", authenticateToken, async (req, res) => {
+  try {
+    const userId = Number(req.user?._id ?? req.user?.id);
+    const batchRes = await mongoose.pool.query(
+      `SELECT batch_id FROM cold_lead_pulls
+        WHERE user_id = $1 AND batch_id IS NOT NULL
+        ORDER BY pulled_at DESC LIMIT 1`,
+      [userId]
+    );
+    const batchId = batchRes.rows[0]?.batch_id || null;
+    if (!batchId) {
+      return res.json({
+        batchId: null,
+        leads: [],
+        summary: { total: 0, hot: 0, warm: 0, returnedCold: 0, pendingNoNote: 0 },
+      });
+    }
+
+    const result = await mongoose.pool.query(
+      `SELECT p.id, p.lead_number, p.pulled_at, p.returned_at, p.return_note, l.company_info
+         FROM cold_lead_pulls p
+         JOIN leads l ON l.lead_number = p.lead_number
+        WHERE p.batch_id = $1
+        ORDER BY p.lead_number ASC`,
+      [batchId]
+    );
+
+    const summary = { total: 0, hot: 0, warm: 0, returnedCold: 0, pendingNoNote: 0 };
+    const leads = result.rows.map((r) => {
+      const status = r.company_info?.leadStatus || "";
+      const returned = !!r.returned_at;
+      let state;
+      if (status === "Hot (0–3 months)") state = "hot";
+      else if (status === "Warm (3–9 months)") state = "warm";
+      else if (returned) state = "returnedCold";
+      else state = "pendingNoNote";
+      summary.total += 1;
+      summary[state] += 1;
+
+      return {
+        pullId: r.id,
+        leadNumber: r.lead_number,
+        companyName: r.company_info?.companyName || null,
+        leadStatus: status,
+        pulledAt: r.pulled_at,
+        returnedAt: r.returned_at,
+        returnNote: r.return_note,
+        state,
+      };
+    });
+
+    res.json({ batchId, leads, summary });
+  } catch (error) {
+    console.error("Error listing my leads:", error);
+    res.status(500).json({ error: "Error listing your leads" });
+  }
+});
+
+// Pull a fresh batch of up to 100 Cold leads matching the given filters, in
+// lead-number order. Blocked while the caller's current batch still has any
+// lead sitting unresolved (still Cold, no return note) — finish what you
+// have before taking more.
+app.post("/api/cold-leads/pull-100", authenticateToken, async (req, res) => {
+  const client = await mongoose.pool.connect();
+  try {
+    const userId = Number(req.user?._id ?? req.user?.id);
+
+    await client.query("BEGIN");
+
+    const currentBatch = await client.query(
+      `SELECT batch_id FROM cold_lead_pulls
+        WHERE user_id = $1 AND batch_id IS NOT NULL
+        ORDER BY pulled_at DESC LIMIT 1`,
+      [userId]
+    );
+    const batchId = currentBatch.rows[0]?.batch_id;
+    if (batchId) {
+      const pendingRes = await client.query(
+        `SELECT COUNT(*)::int AS pending
+           FROM cold_lead_pulls p
+           JOIN leads l ON l.lead_number = p.lead_number
+          WHERE p.batch_id = $1
+            AND p.returned_at IS NULL
+            AND l.company_info->>'leadStatus' = $2`,
+        [batchId, COLD_STATUS]
+      );
+      const pending = pendingRes.rows[0].pending;
+      if (pending > 0) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          error: `You still have ${pending} lead(s) from your current batch that are neither converted nor returned with a note. Resolve those before pulling another 100.`,
+          pending,
+        });
+      }
+    }
+
+    const params = [COLD_STATUS];
+    const filterSql = buildColdFilterSql(req.body || {}, params);
+    const availableRes = await client.query(
+      `SELECT l.lead_number
+         FROM leads l
+        WHERE l.company_info->>'leadStatus' = $1
+          AND ${COLD_AVAILABLE_SQL}
+          ${filterSql}
+        ORDER BY l.lead_number ASC
+        LIMIT ${COLD_BATCH_SIZE}
+        FOR UPDATE OF l SKIP LOCKED`,
+      params
+    );
+
+    if (availableRes.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "No Cold leads match these filters right now." });
+    }
+
+    const newBatchId = `${userId}-${Date.now()}`;
+    const insertedRows = [];
+    for (const row of availableRes.rows) {
+      const r = await client.query(
+        `INSERT INTO cold_lead_pulls (lead_number, user_id, batch_id)
+         VALUES ($1, $2, $3)
+         RETURNING id, lead_number, pulled_at`,
+        [row.lead_number, userId, newBatchId]
+      );
+      insertedRows.push(r.rows[0]);
+    }
+
+    await client.query("COMMIT");
+    res.status(201).json({ batchId: newBatchId, count: insertedRows.length, pulls: insertedRows });
+    broadcastChange("cold-leads", "pulled", { count: insertedRows.length });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error pulling a cold-lead batch:", error);
+    res.status(500).json({ error: "Error pulling leads" });
+  } finally {
+    client.release();
+  }
+});
+
+// Return one Cold lead to the pool — the only way an unconverted lead
+// becomes available to someone else again. Requires the note explaining
+// what action was taken; the two always happen together.
+app.post("/api/cold-leads/:leadNumber/return", authenticateToken, async (req, res) => {
+  try {
+    const leadNumber = Number(req.params.leadNumber);
+    const userId = Number(req.user?._id ?? req.user?.id);
+    const note = String(req.body?.note || "").trim();
+
+    if (!note) {
+      return res.status(400).json({ error: "Describe what action you took before returning this lead." });
+    }
+    if (note.length > 5000) {
+      return res.status(400).json({ error: "Note is too long (max 5000 characters)." });
+    }
+
+    const pullRes = await mongoose.pool.query(
+      `SELECT id FROM cold_lead_pulls
+        WHERE lead_number = $1 AND user_id = $2 AND returned_at IS NULL
+        ORDER BY pulled_at DESC LIMIT 1`,
+      [leadNumber, userId]
+    );
+    if (pullRes.rowCount === 0) {
+      return res.status(404).json({ error: "You don't have an unresolved pull on this lead." });
+    }
+
+    const leadRes = await mongoose.pool.query(
+      `SELECT company_info FROM leads WHERE lead_number = $1`,
+      [leadNumber]
+    );
+    if (leadRes.rowCount === 0) {
+      return res.status(404).json({ error: "Lead not found" });
+    }
+    if (leadRes.rows[0].company_info?.leadStatus !== COLD_STATUS) {
+      return res.status(400).json({
+        error: "This lead has already moved off Cold — there's nothing to return.",
+      });
+    }
+
+    const noteEntry = JSON.stringify([
+      { description: note, addedBy: userId, createdAt: new Date().toISOString() },
+    ]);
+
+    await mongoose.pool.query(
+      `UPDATE leads SET descriptions = descriptions || $1::jsonb WHERE lead_number = $2`,
+      [noteEntry, leadNumber]
+    );
+    await mongoose.pool.query(
+      `UPDATE cold_lead_pulls SET returned_at = NOW(), return_note = $1 WHERE id = $2`,
+      [note, pullRes.rows[0].id]
+    );
+
+    res.json({ success: true });
+    broadcastChange("cold-leads", "returned", { leadNumber });
+    broadcastChange("leads", "updated", { leadNumber });
+  } catch (error) {
+    console.error("Error returning cold lead:", error);
+    res.status(500).json({ error: "Error returning this lead" });
+  }
+});
+
+// --- Bulk Import (Admin) ----------------------------------------------------
+// Turns an arbitrary vendor Excel file — any column names, any order, extra
+// junk rows — into Cold-pool leads. Two steps: /parse reads the file and
+// returns headers/sample rows/a best-guess mapping for the admin to confirm
+// or correct; /commit re-reads the (re-uploaded) file with that confirmed
+// mapping and actually creates the leads. Nothing is held in server memory
+// between the two calls — the browser just sends the file again on commit,
+// which keeps this stateless and avoids needing file storage or sessions.
+app.get(
+  "/api/bulk-import/fields",
+  authenticateToken,
+  checkRole([ROLES.ADMIN]),
+  (req, res) => {
+    res.json({ fields: FIELD_CATALOG });
+  }
+);
+
+app.post(
+  "/api/bulk-import/parse",
+  authenticateToken,
+  checkRole([ROLES.ADMIN]),
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      const sheetIndex = Number.parseInt(req.body.sheetIndex, 10) || 0;
+
+      const workbook = await readWorkbook(req.file.buffer);
+      const sheetNames = workbook.worksheets.map((ws) => ws.name);
+      const worksheet = workbook.worksheets[sheetIndex] || workbook.worksheets[0];
+      if (!worksheet) return res.status(400).json({ error: "That file has no sheets" });
+
+      const rows = sheetToRows(worksheet);
+      const requestedHeaderRow = req.body.headerRowIndex !== undefined
+        ? Number.parseInt(req.body.headerRowIndex, 10)
+        : undefined;
+      const headerRowIndex = Number.isInteger(requestedHeaderRow)
+        ? requestedHeaderRow
+        : detectHeaderRowIndex(rows);
+
+      const { headers, mapping: suggestedMapping, splitRules: suggestedSplitRules } =
+        computeAutoMapping(rows, headerRowIndex);
+      const sampleRows = rows
+        .slice(headerRowIndex + 1, headerRowIndex + 6)
+        .map((r) => r.map((c) => normalizeText(c)));
+      const totalDataRows = Math.max(0, rows.length - headerRowIndex - 1);
+
+      res.json({
+        sheetNames,
+        sheetIndex,
+        headerRowIndex,
+        headers,
+        sampleRows,
+        suggestedMapping,
+        suggestedSplitRules,
+        totalDataRows,
+        fields: FIELD_CATALOG,
+      });
+    } catch (error) {
+      console.error("Error parsing bulk-import file:", error);
+      res.status(400).json({ error: "Could not read that file — is it a valid Excel file?" });
+    }
+  }
+);
+
+// Nothing from Bulk Import writes to the database without the admin having
+// first seen exactly what's about to be pushed — how many companies, what
+// fields they carry, and which ones already exist. That's what /preview
+// (and its zero-touch sibling /auto-preview) is for: it runs the file all
+// the way through the transform and duplicate check, same as a commit
+// would, but never calls .save(). The admin reviews the resulting
+// confirmation list — including a per-duplicate choice, not just a blanket
+// one — and only /commit actually writes anything, using exactly the
+// mapping the preview used.
+
+// Builds the per-company summary the confirmation screen shows, and decides
+// which rows are duplicates. Two different kinds, kept distinct on purpose:
+//  - "in this file" — the same company appears more than once in the
+//    upload itself. This is never optional: only the first occurrence can
+//    ever be imported, no matter what the admin later chooses for database
+//    duplicates, so the UI must show this as a hard fact up front, not a
+//    choice.
+//  - "in the database" — the company already exists as a lead. This one IS
+//    the admin's choice (skip vs push), made on the confirmation screen.
+async function summarizeCompaniesForPreview(leadsData) {
+  const seenInBatch = new Map(); // normalized name -> the DB lead number it already matched (or null)
+  const companies = [];
+
+  for (const leadData of leadsData) {
+    const name = leadData.companyInfo.companyName;
+    const normalized = normalizeCompanyName(name);
+    let isDuplicateInFile = false;
+    let isDuplicateInDb = false;
+    let existingLeadNumber = null;
+
+    if (seenInBatch.has(normalized)) {
+      isDuplicateInFile = true;
+      existingLeadNumber = seenInBatch.get(normalized);
+      isDuplicateInDb = existingLeadNumber !== null;
+    } else {
+      const existing = await findLeadByCompanyName(name);
+      isDuplicateInDb = Boolean(existing);
+      existingLeadNumber = existing ? existing.lead_number : null;
+      seenInBatch.set(normalized, existingLeadNumber);
+    }
+
+    let duplicateReason = null;
+    if (isDuplicateInFile && isDuplicateInDb) duplicateReason = "already in the database, and repeated in this file";
+    else if (isDuplicateInFile) duplicateReason = "repeated within this file — only the first occurrence will be imported";
+    else if (isDuplicateInDb) duplicateReason = "already in the database";
+
+    companies.push({
+      companyName: name,
+      city: leadData.companyInfo.city || "",
+      vertical: leadData.companyInfo.vertical || "",
+      itName: leadData.contactInfo.it.name || "",
+      itMobile: leadData.contactInfo.it.mobile || "",
+      itEmail: leadData.contactInfo.it.email || "",
+      financeName: leadData.contactInfo.finance.name || "",
+      businessHeadName: leadData.contactInfo.businessHead.name || "",
+      turnOverINR: leadData.companyInfo.turnOverINR || "",
+      missingFields: leadData.companyInfo.importMeta.missingFields,
+      isDuplicate: isDuplicateInFile || isDuplicateInDb,
+      isDuplicateInFile,
+      isDuplicateInDb,
+      duplicateReason,
+      existingLeadNumber,
+    });
+  }
+
+  return {
+    companies,
+    duplicateCount: companies.filter((c) => c.isDuplicate).length,
+    inFileDuplicateCount: companies.filter((c) => c.isDuplicateInFile).length,
+    dbDuplicateCount: companies.filter((c) => c.isDuplicateInDb).length,
+  };
+}
+
+// Actually writes the leads. A company repeated within the file is always
+// collapsed to its first occurrence — that's not a choice, it's just never
+// correct to create the same company twice from one upload. `includeDuplicates`
+// only governs the separate case of a row matching something already in the
+// database: false (default) skips it, true pushes it anyway, and either way
+// it's reported back so it's visible afterward what happened.
+async function commitLeads(leadsData, includeDuplicates) {
+  const created = [];
+  const skippedDuplicates = [];
+  const pushedDespiteDuplicate = [];
+  // Maps a normalized company name to the lead number that filled it in
+  // this batch — either an existing DB lead, or one this same commit just
+  // created — so every later occurrence of that company, however it arose,
+  // always resolves against the one true "first" answer.
+  const seenInBatch = new Map();
+
+  for (const leadData of leadsData) {
+    const name = leadData.companyInfo.companyName;
+    const normalized = normalizeCompanyName(name);
+
+    if (seenInBatch.has(normalized)) {
+      // Already handled earlier in this exact file — never inserted a
+      // second time, regardless of the duplicate choice.
+      skippedDuplicates.push({
+        companyName: name,
+        existingLeadNumber: seenInBatch.get(normalized),
+        reason: "repeated within this file",
+      });
+      continue;
+    }
+
+    const existing = await findLeadByCompanyName(name);
+    const isDbDuplicate = Boolean(existing);
+
+    if (isDbDuplicate && !includeDuplicates) {
+      skippedDuplicates.push({ companyName: name, existingLeadNumber: existing.lead_number, reason: "already in the database" });
+      seenInBatch.set(normalized, existing.lead_number);
+      continue;
+    }
+    if (isDbDuplicate) {
+      pushedDespiteDuplicate.push({ companyName: name, existingLeadNumber: existing.lead_number });
+    }
+
+    const lead = new Lead(leadData);
+    const saved = await lead.save();
+    created.push(saved.leadNumber);
+    seenInBatch.set(normalized, saved.leadNumber);
+  }
+
+  return { created, skippedDuplicates, pushedDespiteDuplicate };
+}
+
+// Zero-touch preview: file only. Detects the header row, maps every column
+// (including auto-splitting a combined "Name | Mobile | Email" column), and
+// runs the full duplicate check — but doesn't write anything. The response
+// carries the exact mapping/splitRules/headerRowIndex it used, which the
+// frontend sends straight back to /commit so the write uses the identical
+// interpretation the admin actually reviewed.
+app.post(
+  "/api/bulk-import/auto-preview",
+  authenticateToken,
+  checkRole([ROLES.ADMIN]),
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      const sheetIndex = Number.parseInt(req.body.sheetIndex, 10) || 0;
+
+      const workbook = await readWorkbook(req.file.buffer);
+      const worksheet = workbook.worksheets[sheetIndex] || workbook.worksheets[0];
+      if (!worksheet) return res.status(400).json({ error: "That file has no sheets" });
+      const rows = sheetToRows(worksheet);
+
+      const headerRowIndex = detectHeaderRowIndex(rows);
+      const { mapping, splitRules } = computeAutoMapping(rows, headerRowIndex);
+
+      if (!mapping.companyName) {
+        return res.status(422).json({
+          error: "Could not confidently find a Company Name column in this file — use manual mapping instead.",
+          needsManualMapping: true,
+          headerRowIndex,
+        });
+      }
+
+      const MAX_ROWS = 5000;
+      if (rows.length - headerRowIndex - 1 > MAX_ROWS) {
+        return res.status(400).json({ error: `That's more than ${MAX_ROWS} rows — split the file and import in batches.` });
+      }
+
+      const { leadsData, skipped } = transformRows({
+        rows,
+        headerRowIndex,
+        mapping,
+        splitRules,
+        originalFileName: req.file.originalname,
+        importedBy: req.user.id,
+      });
+      const { companies, duplicateCount, inFileDuplicateCount, dbDuplicateCount } =
+        await summarizeCompaniesForPreview(leadsData);
+
+      res.json({
+        sheetIndex,
+        headerRowIndex,
+        mapping,
+        splitRules,
+        totalCount: companies.length,
+        duplicateCount,
+        inFileDuplicateCount,
+        dbDuplicateCount,
+        skipped,
+        companies,
+      });
+    } catch (error) {
+      console.error("Error previewing bulk-import file:", error);
+      res.status(400).json({ error: "Could not read that file — is it a valid Excel file?" });
+    }
+  }
+);
+
+// Manual-mapping preview — same duplicate-check + summary as auto-preview,
+// but using the mapping the admin chose on the mapping screen instead of
+// guessing one.
+app.post(
+  "/api/bulk-import/preview",
+  authenticateToken,
+  checkRole([ROLES.ADMIN]),
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      const sheetIndex = Number.parseInt(req.body.sheetIndex, 10) || 0;
+      const headerRowIndex = Number.parseInt(req.body.headerRowIndex, 10) || 0;
+      const mapping = JSON.parse(req.body.mapping || "{}");
+      const splitRules = JSON.parse(req.body.splitRules || "[]");
+
+      if (!mapping.companyName) {
+        return res.status(400).json({ error: "Company Name must be mapped to a column before importing" });
+      }
+
+      const workbook = await readWorkbook(req.file.buffer);
+      const worksheet = workbook.worksheets[sheetIndex] || workbook.worksheets[0];
+      if (!worksheet) return res.status(400).json({ error: "That file has no sheets" });
+      const rows = sheetToRows(worksheet);
+
+      const MAX_ROWS = 5000;
+      if (rows.length - headerRowIndex - 1 > MAX_ROWS) {
+        return res.status(400).json({ error: `That's more than ${MAX_ROWS} rows — split the file and import in batches.` });
+      }
+
+      const { leadsData, skipped } = transformRows({
+        rows,
+        headerRowIndex,
+        mapping,
+        splitRules,
+        originalFileName: req.file.originalname,
+        importedBy: req.user.id,
+      });
+      const { companies, duplicateCount, inFileDuplicateCount, dbDuplicateCount } =
+        await summarizeCompaniesForPreview(leadsData);
+
+      res.json({
+        sheetIndex,
+        headerRowIndex,
+        mapping,
+        splitRules,
+        totalCount: companies.length,
+        duplicateCount,
+        inFileDuplicateCount,
+        dbDuplicateCount,
+        skipped,
+        companies,
+      });
+    } catch (error) {
+      console.error("Error previewing bulk-import file:", error);
+      res.status(400).json({ error: "Could not read that file — is it a valid Excel file?" });
+    }
+  }
+);
+
+// The only route that actually writes leads. Always takes the exact
+// mapping/splitRules/headerRowIndex a preview call just returned, plus the
+// admin's explicit includeDuplicates choice from that confirmation screen —
+// there is no path into the Cold Pool that skips the preview step.
+app.post(
+  "/api/bulk-import/commit",
+  authenticateToken,
+  checkRole([ROLES.ADMIN]),
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      const sheetIndex = Number.parseInt(req.body.sheetIndex, 10) || 0;
+      const headerRowIndex = Number.parseInt(req.body.headerRowIndex, 10) || 0;
+      const mapping = JSON.parse(req.body.mapping || "{}");
+      const splitRules = JSON.parse(req.body.splitRules || "[]");
+      const includeDuplicates = req.body.includeDuplicates === "true" || req.body.includeDuplicates === true;
+
+      if (!mapping.companyName) {
+        return res.status(400).json({ error: "Company Name must be mapped to a column before importing" });
+      }
+
+      const workbook = await readWorkbook(req.file.buffer);
+      const worksheet = workbook.worksheets[sheetIndex] || workbook.worksheets[0];
+      if (!worksheet) return res.status(400).json({ error: "That file has no sheets" });
+      const rows = sheetToRows(worksheet);
+
+      const MAX_ROWS = 5000;
+      if (rows.length - headerRowIndex - 1 > MAX_ROWS) {
+        return res.status(400).json({ error: `That's more than ${MAX_ROWS} rows — split the file and import in batches.` });
+      }
+
+      const { leadsData, skipped } = transformRows({
+        rows,
+        headerRowIndex,
+        mapping,
+        splitRules,
+        originalFileName: req.file.originalname,
+        importedBy: req.user.id,
+      });
+
+      const { created, skippedDuplicates, pushedDespiteDuplicate } = await commitLeads(
+        leadsData,
+        includeDuplicates
+      );
+
+      if (created.length) {
+        broadcastChange("leads", "created", { count: created.length, bulkImport: true });
+        broadcastChange("cold-leads", "pulled", { count: 0 }); // nudge any open Cold Pool views to refresh
+      }
+
+      res.json({
+        createdCount: created.length,
+        leadNumbers: created,
+        skipped,
+        duplicates: skippedDuplicates,
+        pushedDespiteDuplicate,
+        mappingUsed: mapping,
+        splitRulesUsed: splitRules,
+      });
+    } catch (error) {
+      console.error("Error committing bulk import:", error);
+      res.status(500).json({ error: "Error importing leads from that file" });
+    }
+  }
+);
+
+app.get(
+  "/api/bulk-import/presets",
+  authenticateToken,
+  checkRole([ROLES.ADMIN]),
+  async (req, res) => {
+    try {
+      const result = await mongoose.pool.query(
+        `SELECT id, name, mapping, split_rules AS "splitRules", created_at AS "createdAt"
+         FROM import_mapping_presets ORDER BY created_at DESC`
+      );
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error listing import presets:", error);
+      res.status(500).json({ error: "Error listing saved mappings" });
+    }
+  }
+);
+
+app.post(
+  "/api/bulk-import/presets",
+  authenticateToken,
+  checkRole([ROLES.ADMIN]),
+  async (req, res) => {
+    try {
+      const { name, mapping, splitRules } = req.body || {};
+      if (!name || !name.trim()) return res.status(400).json({ error: "Name is required" });
+      const result = await mongoose.pool.query(
+        `INSERT INTO import_mapping_presets (name, mapping, split_rules, created_by)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        [name.trim(), JSON.stringify(mapping || {}), JSON.stringify(splitRules || []), req.user.id]
+      );
+      res.status(201).json({ id: result.rows[0].id });
+    } catch (error) {
+      console.error("Error saving import preset:", error);
+      res.status(500).json({ error: "Error saving this mapping" });
+    }
+  }
+);
+
+app.delete(
+  "/api/bulk-import/presets/:id",
+  authenticateToken,
+  checkRole([ROLES.ADMIN]),
+  async (req, res) => {
+    try {
+      await mongoose.pool.query(`DELETE FROM import_mapping_presets WHERE id = $1`, [req.params.id]);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting import preset:", error);
+      res.status(500).json({ error: "Error deleting this mapping" });
+    }
+  }
+);
+
 // --- Generated reports -----------------------------------------------------
 // Metadata only; the PDF bytes are never included in the list response.
 // Scoped to the caller's branch so a Business Lead sees only its own reports.
@@ -758,7 +1756,7 @@ app.get("/api/reports", authenticateToken, async (req, res) => {
     let where = "";
     if (scopeIds !== null) {
       if (scopeIds.length === 0) return res.json([]);
-      where = `WHERE r.generated_by IN (${scopeIds.map((_, i) => `$${i + 1}`).join(", ")})`;
+      where = `WHERE r.generated_by IN (${placeholderList(scopeIds)})`;
       params.push(...scopeIds);
     }
 
@@ -791,6 +1789,315 @@ app.get("/api/reports", authenticateToken, async (req, res) => {
   }
 });
 
+// --- Pipeline funnel report -------------------------------------------------
+// Two things sales leadership actually asks for that the Pipeline board alone
+// can't answer: "how many leads make it from stage to stage" and "how long do
+// they sit in each stage". Both are derived from data already stored — no new
+// table. The stage-reached funnel comes from each lead's current stage; the
+// dwell times come from the field-level diffs the lead-update audit trail
+// already records whenever `pipelineStage` changes.
+
+// Mirrors src/components/Home/pipeline.js exactly, so a lead's stage here
+// always agrees with what the Pipeline board shows for the same lead.
+const FUNNEL_STAGE_ORDER = ["prospecting", "qualification", "proposal", "negotiation", "won"];
+const FUNNEL_STAGE_LABELS = {
+  prospecting: "Prospecting",
+  qualification: "Qualification",
+  proposal: "Proposal",
+  negotiation: "Negotiation",
+  won: "Closed-Won",
+};
+const FUNNEL_STAGE_BY_LABEL = {
+  prospecting: "prospecting",
+  qualification: "qualification",
+  proposal: "proposal",
+  negotiation: "negotiation",
+  "closed-won": "won",
+};
+const FUNNEL_ACTION_STAGE = {
+  "Call Back": "prospecting",
+  "Follow-Up": "prospecting",
+  "": "prospecting",
+  "Online Meeting": "qualification",
+  "On-Site Meeting": "qualification",
+  "Proposal Submitted": "proposal",
+  Negotiation: "negotiation",
+};
+const FUNNEL_DEAD_STATUSES = new Set(["LOST", "Junk", "Duplicate"]);
+
+// Returns a stage key, or null for a lead that has left the open pipeline
+// (won or dead) — dead leads are excluded from the funnel entirely, won ones
+// count as having reached every stage.
+function funnelStageOf(companyInfo = {}) {
+  const status = String(companyInfo.leadStatus || "").trim();
+  if (status === "WON") return "won";
+  if (FUNNEL_DEAD_STATUSES.has(status)) return null;
+
+  const stored = String(companyInfo.pipelineStage || "").trim().toLowerCase();
+  if (FUNNEL_STAGE_BY_LABEL[stored]) return FUNNEL_STAGE_BY_LABEL[stored];
+
+  const action = String(companyInfo.nextAction || "").trim();
+  return FUNNEL_ACTION_STAGE[action] || "prospecting";
+}
+
+// Groups audit_log's pipelineStage diffs by lead, oldest first — pulled out
+// of the route handler below purely to keep that function's own branching
+// shallow; the behaviour is unchanged.
+function groupStageTransitionsByLead(transitionRows) {
+  const transitionsByLead = new Map();
+  for (const t of transitionRows) {
+    const leadNumber = Number(t.entity_id);
+    if (!Number.isFinite(leadNumber)) continue;
+    const change = (t.changes || []).find((c) => c.field === "pipelineStage");
+    if (!change) continue;
+    const list = transitionsByLead.get(leadNumber) || [];
+    list.push({
+      at: t.created_at,
+      from: FUNNEL_STAGE_BY_LABEL[String(change.from || "").trim().toLowerCase()] || null,
+      to: FUNNEL_STAGE_BY_LABEL[String(change.to || "").trim().toLowerCase()] || null,
+    });
+    transitionsByLead.set(leadNumber, list);
+  }
+  return transitionsByLead;
+}
+
+// Days spent in each stage, gathered from every lead that has at least one
+// recorded transition or is currently sitting in an open stage — the
+// in-progress segment (current stage, up to now) is included too, so early
+// data isn't thrown away, just averaged in as still-ongoing time.
+function computeDwellDaysByStage(openOrWon, transitionsByLead) {
+  const durationDaysByStage = Object.fromEntries(FUNNEL_STAGE_ORDER.map((s) => [s, []]));
+  const now = Date.now();
+
+  for (const lead of openOrWon) {
+    const transitions = transitionsByLead.get(lead.leadNumber) || [];
+    let prevTime = new Date(lead.createdAt).getTime();
+    let prevStage = transitions.length > 0 ? transitions[0].from || "prospecting" : lead.stage;
+
+    for (const t of transitions) {
+      const at = new Date(t.at).getTime();
+      if (durationDaysByStage[prevStage] && at > prevTime) {
+        durationDaysByStage[prevStage].push((at - prevTime) / 86400000);
+      }
+      prevTime = at;
+      prevStage = t.to || prevStage;
+    }
+
+    // Final, still-open segment up to now.
+    if (durationDaysByStage[prevStage] && now > prevTime && prevStage !== "won") {
+      durationDaysByStage[prevStage].push((now - prevTime) / 86400000);
+    }
+  }
+
+  return durationDaysByStage;
+}
+
+app.get("/api/reports/pipeline-funnel", authenticateToken, async (req, res) => {
+  try {
+    // Every signed-in user sees every company on the Pipeline board itself
+    // (see GET /api/leads), so the funnel built from the same leads is
+    // unscoped too — a partial funnel per person would misstate every rate.
+    const leadsRes = await mongoose.pool.query(
+      `SELECT lead_number, company_info, created_at FROM leads`
+    );
+
+    const rows = leadsRes.rows.map((r) => ({
+      leadNumber: r.lead_number,
+      createdAt: r.created_at,
+      companyInfo: r.company_info || {},
+      stage: funnelStageOf(r.company_info || {}),
+    }));
+
+    const deadByStatus = { LOST: 0, Junk: 0, Duplicate: 0 };
+    rows.forEach((r) => {
+      if (r.stage === null) {
+        const status = String(r.companyInfo.leadStatus || "").trim();
+        if (deadByStatus[status] !== undefined) deadByStatus[status] += 1;
+      }
+    });
+
+    const openOrWon = rows.filter((r) => r.stage !== null);
+    const rankOf = (stage) => FUNNEL_STAGE_ORDER.indexOf(stage);
+
+    const funnel = FUNNEL_STAGE_ORDER.map((stage, i) => {
+      const count = openOrWon.filter((r) => rankOf(r.stage) >= i).length;
+      return { stage, label: FUNNEL_STAGE_LABELS[stage], count };
+    });
+    for (let i = 0; i < funnel.length; i++) {
+      funnel[i].conversionFromPrev =
+        i === 0 || funnel[i - 1].count === 0
+          ? null
+          : Math.round((funnel[i].count / funnel[i - 1].count) * 1000) / 10;
+    }
+
+    // Every recorded pipelineStage transition, oldest first, per lead — the
+    // raw material for "how long did a lead actually sit in each stage".
+    const transitionsRes = await mongoose.pool.query(
+      `SELECT entity_id, changes, created_at
+         FROM audit_log
+        WHERE entity = 'lead'
+          AND changes @> '[{"field":"pipelineStage"}]'::jsonb
+        ORDER BY entity_id, created_at ASC`
+    );
+
+    const transitionsByLead = groupStageTransitionsByLead(transitionsRes.rows);
+    const durationDaysByStage = computeDwellDaysByStage(openOrWon, transitionsByLead);
+
+    const avg = (arr) => (arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null);
+    funnel.forEach((f) => {
+      f.avgDaysInStage = avg(durationDaysByStage[f.stage]);
+      f.dwellSamples = durationDaysByStage[f.stage].length;
+    });
+
+    res.json({
+      funnel,
+      dead: {
+        total: Object.values(deadByStatus).reduce((a, b) => a + b, 0),
+        byStatus: deadByStatus,
+      },
+      totalLeads: rows.length,
+    });
+  } catch (error) {
+    console.error("Error building pipeline funnel report:", error);
+    res.status(500).json({ error: "Error building pipeline funnel report" });
+  }
+});
+
+// --- Cold Lead Pool report ---------------------------------------------------
+// Admin/Manager visibility into who is actually working the Cold pool: how
+// many they've pulled in total, how many they turned Hot/Warm, how many are
+// still sitting unresolved, when they last pulled, and — per user — the full
+// list of leads they've ever pulled with the note they left on each one.
+app.get(
+  "/api/reports/cold-leads",
+  authenticateToken,
+  checkRole([ROLES.ADMIN, ROLES.MANAGER]),
+  async (req, res) => {
+    try {
+      const scopeIds = await visibleUserIds(req.user);
+      const scoped = scopeIds !== null;
+      if (scoped && scopeIds.length === 0) {
+        return res.json({ users: [], detail: null });
+      }
+
+      const idParams = scoped ? scopeIds : [];
+      const idList = scoped ? `(${placeholderList(scopeIds)})` : null;
+      const userFilter = scoped ? `WHERE u.id IN ${idList}` : "";
+
+      const users = await mongoose.pool.query(
+        `SELECT u.id, u.first_name, u.last_name, u.role, u.designation
+           FROM users u
+           ${userFilter}
+          ORDER BY u.first_name, u.last_name`,
+        idParams
+      );
+
+      // One row per pull, joined to the lead's current status so a pull can be
+      // classified the same way My Leads classifies it — hot / warm / returned
+      // (still Cold, sent back with a note) / pending (still out, no note yet).
+      const pulls = await mongoose.pool.query(
+        `SELECT p.id, p.user_id, p.lead_number, p.pulled_at, p.returned_at,
+                p.return_note, p.batch_id, l.company_info->>'companyName' AS company_name,
+                l.company_info->>'leadStatus' AS lead_status
+           FROM cold_lead_pulls p
+           JOIN leads l ON l.lead_number = p.lead_number
+          ${scoped ? `WHERE p.user_id IN ${idList}` : ""}
+          ORDER BY p.pulled_at DESC`,
+        idParams
+      );
+
+      const byUser = new Map();
+      pulls.rows.forEach((r) => {
+        const uid = Number(r.user_id);
+        const list = byUser.get(uid) || [];
+        list.push(r);
+        byUser.set(uid, list);
+      });
+
+      const classify = (row) => {
+        if (row.lead_status === "Hot (0–3 months)") return "hot";
+        if (row.lead_status === "Warm (3–9 months)") return "warm";
+        if (row.returned_at) return "returnedCold";
+        return "pendingNoNote";
+      };
+
+      const summary = users.rows.map((u) => {
+        const rows = byUser.get(u.id) || [];
+        const counts = { hot: 0, warm: 0, returnedCold: 0, pendingNoNote: 0 };
+        rows.forEach((r) => {
+          counts[classify(r)] += 1;
+        });
+
+        // "Last pull" means the most recent pull *action* — a whole batch, up
+        // to 100 leads at once — not the single most recent lead row. A few
+        // historical rows predate batching and carry no batch_id; they're
+        // skipped here (same rule /api/cold-leads/my-leads uses for "current
+        // batch") so they never get counted as a one-lead "pull".
+        const batched = rows.filter((r) => r.batch_id);
+        const lastBatchId = batched[0]?.batch_id || null;
+        const lastBatchRows = lastBatchId
+          ? batched.filter((r) => r.batch_id === lastBatchId)
+          : [];
+        const lastPullAt = lastBatchRows.length
+          ? lastBatchRows.reduce(
+              (max, r) => (new Date(r.pulled_at) > new Date(max) ? r.pulled_at : max),
+              lastBatchRows[0].pulled_at
+            )
+          : null;
+
+        return {
+          id: u.id,
+          name: [u.first_name, u.last_name].filter(Boolean).join(" "),
+          role: u.role,
+          designation: u.designation,
+          totalPulled: rows.length,
+          turnedHot: counts.hot,
+          turnedWarm: counts.warm,
+          returnedCold: counts.returnedCold,
+          pendingNoNote: counts.pendingNoNote,
+          lastPullAt,
+          // How many leads came in that last pull action — this is the number
+          // that actually answers "how many did they pull last time", not a
+          // single company name that would be meaningless for a 100-lead batch.
+          lastPullCount: lastBatchRows.length,
+        };
+      });
+
+      // Optional drill-down: every pull a single user has ever made, most
+      // recent first, with the note they left (if any) and what the lead is
+      // now — the "what all have they done on this lead" view.
+      const wanted = req.query.userId ? Number(req.query.userId) : null;
+      let detail = null;
+
+      if (wanted && !Number.isNaN(wanted)) {
+        if (scoped && !scopeIds.includes(wanted)) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+        const rows = byUser.get(wanted) || [];
+        detail = {
+          userId: wanted,
+          pulls: rows.map((r) => ({
+            pullId: r.id,
+            leadNumber: r.lead_number,
+            companyName: r.company_name,
+            leadStatus: r.lead_status,
+            batchId: r.batch_id,
+            pulledAt: r.pulled_at,
+            returnedAt: r.returned_at,
+            returnNote: r.return_note,
+            state: classify(r),
+          })),
+        };
+      }
+
+      res.json({ users: summary, detail });
+    } catch (error) {
+      console.error("Error building Cold Lead Pool report:", error);
+      res.status(500).json({ error: "Error building Cold Lead Pool report" });
+    }
+  }
+);
+
 // --- Per-user work report --------------------------------------------------
 // Who created which leads, what they logged against them, and what tasks they
 // worked. Admin tiers only — enforced here, not just hidden in the UI. Still
@@ -812,9 +2119,7 @@ app.get(
 
       // One placeholder list reused by every query below.
       const idParams = scoped ? scopeIds : [];
-      const idList = scoped
-        ? `(${scopeIds.map((_, i) => `$${i + 1}`).join(", ")})`
-        : null;
+      const idList = scoped ? `(${placeholderList(scopeIds)})` : null;
       const userFilter = scoped ? `WHERE u.id IN ${idList}` : "";
 
       const users = await mongoose.pool.query(
@@ -1105,7 +2410,7 @@ app.get("/api/reports/:reportId/download", authenticateToken, async (req, res) =
     res.setHeader("Content-Type", report.mime_type || "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${report.file_name.replace(/"/g, "")}"`
+      `attachment; filename="${report.file_name.replaceAll('"', "")}"`
     );
     res.send(report.content);
   } catch (error) {
@@ -1358,10 +2663,26 @@ app.get("/api/assignable-users", authenticateToken, async (req, res) => {
 // GET all tasks for logged-in user (or subordinates if supervisor/admin)
 app.get("/api/tasks", authenticateToken, async (req, res) => {
   try {
-    const ids = await visibleUserIds(req.user);
-    const query = ids === null ? {} : { user_id: { $in: ids } };
+    // A to-do is private between whoever it belongs to and whoever assigned
+    // it — not visible to a manager's whole team or to every Admin, unlike
+    // leads and most other records. Task.find() only filters by user_id, so
+    // the owner-or-assigner check is applied here instead of in the query.
+    const callerId = Number(req.user?._id ?? req.user?.id);
+    const allTasks = await Task.find({});
 
-    const tasks = await Task.find(query);
+    // The one deliberate exception: an Admin looking at the Home dashboard's
+    // "view someone's work" dropdown may ask for a specific person's own
+    // to-do list (their assigned tasks). Still not the same as the general
+    // hierarchy visibility used elsewhere — a non-Admin passing this is
+    // simply ignored and falls back to their own tasks as usual.
+    const viewUserId = Number(req.query.userId);
+    const isAdmin = normalizeRole(req.user?.role) === ROLES.ADMIN;
+    const tasks =
+      isAdmin && Number.isFinite(viewUserId)
+        ? (allTasks || []).filter((t) => Number(t.userId) === viewUserId)
+        : (allTasks || []).filter(
+            (t) => Number(t.userId) === callerId || Number(t.assignedBy) === callerId
+          );
 
     // Attach owner / assigner names so the client can say who a task belongs to
     // and who handed it over, without a second round trip per task.
@@ -1460,7 +2781,7 @@ app.put("/api/tasks/:taskId", authenticateToken, async (req, res) => {
   try {
     const { taskId } = req.params;
     let task;
-    if (!isNaN(Number(taskId))) {
+    if (!Number.isNaN(Number(taskId))) {
       task = await Task.findOne({ id: Number(taskId) });
     }
     if (!task) {
@@ -1527,7 +2848,7 @@ app.put("/api/leads/assign-bulk", authenticateToken, async (req, res) => {
     }
 
     const assignedUser = await User.findById(assignedUserId);
-    if (!assignedUser || assignedUser.status !== "active") {
+    if (assignedUser?.status !== "active") {
       return res.status(400).json({ error: "Assigned user must be active." });
     }
 
@@ -1580,15 +2901,15 @@ app.put("/api/leads/:leadNumber", authenticateToken, async (req, res) => {
     if (!(await userCanEditLead(req.user, lead))) {
       return res.status(403).json({
         error:
-          "Only the person who created this lead, their manager, or an " +
-          "Admin can edit it.",
+          "Only the person who created this lead, their manager, whoever " +
+          "it's assigned to, or an Admin can edit it.",
       });
     }
 
     // Record which fields actually changed. The audit log otherwise says only
     // that a lead was updated, and "who moved this to LOST" is the question
     // people actually ask.
-    const before = JSON.parse(JSON.stringify(lead.companyInfo || {}));
+    const before = structuredClone(lead.companyInfo || {});
 
     // Update `companyInfo`, `contactInfo`, `itLandscape`, and `descriptions` if present in request
     if (req.body.companyInfo) {
@@ -1664,8 +2985,8 @@ app.post("/api/leads/:leadNumber/descriptions", authenticateToken, async (req, r
     if (!(await userCanEditLead(req.user, lead))) {
       return res.status(403).json({
         error:
-          "Only the person who created this lead, their manager, or an " +
-          "Admin can add notes to it.",
+          "Only the person who created this lead, their manager, whoever " +
+          "it's assigned to, or an Admin can add notes to it.",
       });
     }
 
@@ -1681,6 +3002,11 @@ app.post("/api/leads/:leadNumber/descriptions", authenticateToken, async (req, r
     await lead.populate("descriptions.addedBy", "firstName");
 
     res.json(lead);
+    // Missing before: the Activity panel, Cold Lead Pool tooltip/report, and
+    // Pipeline funnel all read the lead's own note history, but nothing told
+    // any other open screen a note had just landed — they'd only pick it up
+    // on their next unrelated refresh.
+    broadcastChange("leads", "note_added", { leadNumber: lead.leadNumber });
   } catch (error) {
     console.error("Error in add description route:", error);
     res.status(500).json({ error: "Server error" });
@@ -1693,6 +3019,15 @@ app.use((err, req, res, next) => {
     return res.status(413).json({
       success: false,
       message: "Payload too large",
+    });
+  }
+  // multer's own oversized-file error — without this it fell through to
+  // Express's default HTML error page instead of the JSON error shape every
+  // other route already returns.
+  if (err.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({
+      success: false,
+      message: "File is too large. Maximum attachment size is 10MB.",
     });
   }
   next(err);
@@ -1708,6 +3043,7 @@ app.get("/api/admin/users", authenticateToken, checkRole([ROLES.ADMIN]), async (
     const users = await User.find({}, "-password");
     res.json(users);
   } catch (error) {
+    console.error("Error listing admin users:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1768,7 +3104,7 @@ app.post("/api/users", authenticateToken, checkRole([ROLES.ADMIN, ROLES.MANAGER]
     });
 
     const savedUser = await newUser.save();
-    if (savedUser && savedUser.password) delete savedUser.password;
+    delete savedUser?.password;
 
     res.status(201).json(savedUser);
     broadcastChange("users", "created", { userId: savedUser._id ?? savedUser.id });
@@ -1847,6 +3183,24 @@ app.get("/api/users", authenticateToken, async (req, res) => {
       success: false,
       error: "Error fetching user data",
     });
+  }
+});
+
+// Every Manager's first name, for the BDM field on the lead form. This is a
+// label, not an access grant, so it is deliberately NOT scoped by
+// visibleUserIds like /api/users is: an Executive's own Manager sits above
+// them in the reporting tree and would otherwise never appear in their own
+// downward-only view, leaving the BDM dropdown empty for every Executive.
+app.get("/api/bdms", authenticateToken, async (req, res) => {
+  try {
+    const managers = await User.find(
+      { role: ROLES.MANAGER, status: "active" },
+      { firstName: 1, lastName: 1 }
+    );
+    res.json((managers || []).map((u) => u.firstName));
+  } catch (error) {
+    console.error("Error fetching BDM list:", error);
+    res.status(500).json({ error: "Error fetching BDM list" });
   }
 });
 
@@ -2097,6 +3451,7 @@ app.get("/api/team-overview", authenticateToken, async (req, res) => {
     // Make sure you send a valid JSON response
     res.json({ users });
   } catch (error) {
+    console.error("Error fetching team overview:", error);
     res
       .status(500)
       .json({ error: "Error fetching team data" });
@@ -2301,7 +3656,7 @@ app.get("/api/chat/messages/direct/:targetUserId", authenticateToken, async (req
       recipientName: `${r.recipient_first_name || ''} ${r.recipient_last_name || ''}`.trim(),
       content: r.content,
       createdAt: r.created_at,
-      readBy: Array.isArray(r.read_by) ? r.read_by : (typeof r.read_by === 'string' ? JSON.parse(r.read_by) : [])
+      readBy: asArray(r.read_by)
     }));
 
     res.json(messages);
@@ -2317,7 +3672,7 @@ app.post("/api/chat/messages/direct", authenticateToken, async (req, res) => {
     const senderId = Number(req.user._id || req.user.id);
     const { recipientId, content } = req.body;
 
-    if (!recipientId || !content || !content.trim()) {
+    if (!recipientId || !content?.trim()) {
       return res.status(400).json({ error: "Recipient and content are required" });
     }
 
@@ -2365,7 +3720,7 @@ app.get("/api/chat/groups", authenticateToken, async (req, res) => {
     const result = await mongoose.pool.query(query);
 
     const userGroups = result.rows.filter(g => {
-      const members = Array.isArray(g.members) ? g.members : (typeof g.members === 'string' ? JSON.parse(g.members) : []);
+      const members = asArray(g.members);
       return g.created_by === currentUserId || members.map(Number).includes(currentUserId);
     }).map(g => ({
       id: g.id,
@@ -2373,7 +3728,7 @@ app.get("/api/chat/groups", authenticateToken, async (req, res) => {
       description: g.description,
       createdBy: g.created_by,
       creatorName: `${g.creator_first_name} ${g.creator_last_name}`.trim(),
-      members: Array.isArray(g.members) ? g.members : (typeof g.members === 'string' ? JSON.parse(g.members) : []),
+      members: asArray(g.members),
       createdAt: g.created_at
     }));
 
@@ -2390,7 +3745,7 @@ app.post("/api/chat/groups", authenticateToken, async (req, res) => {
     const creatorId = Number(req.user._id || req.user.id);
     const { name, description, memberIds } = req.body;
 
-    if (!name || !name.trim()) {
+    if (!name?.trim()) {
       return res.status(400).json({ error: "Group name is required" });
     }
 
@@ -2468,7 +3823,7 @@ app.get("/api/chat/messages/group/:groupId", authenticateToken, async (req, res)
       groupId: r.group_id,
       content: r.content,
       createdAt: r.created_at,
-      readBy: Array.isArray(r.read_by) ? r.read_by : (typeof r.read_by === 'string' ? JSON.parse(r.read_by) : [])
+      readBy: asArray(r.read_by)
     }));
 
     res.json(messages);
@@ -2484,7 +3839,7 @@ app.post("/api/chat/messages/group", authenticateToken, async (req, res) => {
     const senderId = Number(req.user._id || req.user.id);
     const { groupId, content } = req.body;
 
-    if (!groupId || !content || !content.trim()) {
+    if (!groupId || !content?.trim()) {
       return res.status(400).json({ error: "Group ID and content are required" });
     }
 
@@ -2539,7 +3894,7 @@ app.get("/api/chat/messages/global", authenticateToken, async (req, res) => {
       isGlobal: true,
       content: r.content,
       createdAt: r.created_at,
-      readBy: Array.isArray(r.read_by) ? r.read_by : (typeof r.read_by === 'string' ? JSON.parse(r.read_by) : [])
+      readBy: asArray(r.read_by)
     }));
 
     res.json(messages);
@@ -2555,7 +3910,7 @@ app.post("/api/chat/messages/global", authenticateToken, checkRole([ROLES.ADMIN]
     const senderId = Number(req.user._id || req.user.id);
     const { content } = req.body;
 
-    if (!content || !content.trim()) {
+    if (!content?.trim()) {
       return res.status(400).json({ error: "Announcement content is required" });
     }
 
@@ -2676,11 +4031,7 @@ app.get("/api/chat/unread", authenticateToken, async (req, res) => {
     );
     const myGroupIds = groupsRes.rows
       .filter((g) => {
-        const members = Array.isArray(g.members)
-          ? g.members
-          : typeof g.members === "string"
-          ? JSON.parse(g.members)
-          : [];
+        const members = asArray(g.members);
         return g.created_by === me || members.map(Number).includes(me);
       })
       .map((g) => g.id);
@@ -2746,7 +4097,7 @@ const shutdown = (signal) => {
   io.close();
   server.close(async () => {
     try {
-      if (mongoose.pool && mongoose.pool.end) await mongoose.pool.end();
+      if (mongoose.pool?.end) await mongoose.pool.end();
     } catch (e) {
       console.error("Error closing DB pool:", e.message);
     }

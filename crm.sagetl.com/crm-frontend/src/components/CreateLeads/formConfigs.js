@@ -73,11 +73,13 @@ export const companyFormConfig = [
   [
     {
       // Read by the pipeline for deal values. It had no input anywhere, which
-      // is why every money figure in the app read zero.
+      // is why every money figure in the app read zero. Only meaningful once
+      // a lead is Hot — everything earlier in the funnel doesn't have a real
+      // number yet — so it's hidden otherwise, and optional even when shown.
       name: "expectedDealValue",
       label: "Expected Deal Value (INR)",
       type: "number",
-      required: true,
+      showIf: { field: "leadStatus", equals: "Hot (0–3 months)" },
     },
     {
       // The pipeline used to infer the stage from nextAction, so scheduling a
@@ -253,8 +255,7 @@ export const itLandscapeConfig = {
       {
         name: "supportPartner",
         label: "Support Partner",
-        type: "select",
-        options: "partnerOptions",
+        type: "text",
       },
     ],
     [

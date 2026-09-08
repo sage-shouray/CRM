@@ -10,7 +10,7 @@
  * Usage:  node scratch/import_net_new.js <path-to-net_new.json> [--dry-run]
  */
 require("dotenv").config();
-const fs = require("fs");
+const fs = require("node:fs");
 const jwt = require("jsonwebtoken");
 
 const SRC = process.argv[2];
@@ -42,32 +42,48 @@ const VERTICAL_RULES = [
   [/railway|psu/i, "PSU's / QUASSI"],
 ];
 
+// Every path assigns into one local and returns it once — several separate
+// `return`s of differently-inferred types (an early "", a loop value, a
+// final "") is what static analysis flags, and one exit point is clearer
+// to read anyway.
 function toVertical(industry) {
-  if (!industry) return "";
-  for (const [re, value] of VERTICAL_RULES) if (re.test(industry)) return value;
-  return "";
+  let result = "";
+  if (industry) {
+    const match = VERTICAL_RULES.find(([re]) => re.test(industry));
+    if (match) result = match[1];
+  }
+  return result;
 }
 
 // "1,060 Crore" / "675 Cr" / "2,500+ Cr" -> one of the CRM's turnover bands.
 function toTurnoverBand(text) {
-  if (!text) return "";
-  const m = String(text).replace(/,/g, "").match(/([\d.]+)/);
-  if (!m) return "";
-  const cr = parseFloat(m[1]);
-  if (!isFinite(cr)) return "";
-  if (cr < 10) return "<10Cr";
-  if (cr < 50) return "10-50Cr";
-  if (cr < 100) return "50-100Cr";
-  return "100Cr+";
+  let result = "";
+  if (text) {
+    const digitsOnly = String(text).replaceAll(",", "");
+    const match = /([\d.]+)/.exec(digitsOnly);
+    const cr = match ? Number.parseFloat(match[1]) : NaN;
+    if (Number.isFinite(cr)) {
+      if (cr < 10) result = "<10Cr";
+      else if (cr < 50) result = "10-50Cr";
+      else if (cr < 100) result = "50-100Cr";
+      else result = "100Cr+";
+    }
+  }
+  return result;
 }
 
 const ERP_OPTIONS = ["Microsoft", "Oracle", "Infor", "Epicor", "SAP B1", "SAP BYD", "Tally"];
+const REGEX_SPECIAL_CHARS = /[.*+?^${}()|[\]\\]/g;
 function toErpOption(text) {
-  if (!text) return "";
-  for (const opt of ERP_OPTIONS) {
-    if (new RegExp(opt.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(text)) return opt;
+  let result = "";
+  if (text) {
+    const match = ERP_OPTIONS.find((opt) => {
+      const escaped = opt.replaceAll(REGEX_SPECIAL_CHARS, String.raw`\$&`);
+      return new RegExp(escaped, "i").test(text);
+    });
+    result = match || "Other ERP";
   }
-  return "Other ERP";
+  return result;
 }
 
 // "Thane (West), Maharashtra" -> { city, state }. Only splits on the last
@@ -135,6 +151,74 @@ function routeContacts(contacts) {
 
 // --- run -------------------------------------------------------------------
 
+// Everything the CRM has no column for is preserved as a note rather than
+// silently lost when the sheet is imported.
+function buildLeftoverNotes(r) {
+  return [
+    "Imported from the 'Net new' spreadsheet.",
+    r.industry ? `Industry (as listed): ${r.industry}` : "",
+    r.turnover ? `Turnover (as listed): ${r.turnover}` : "",
+    r.erp ? `Existing ERP: ${r.erp}` : "",
+    r.location ? `Location (as listed): ${r.location}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+function buildLeadPayload(r, name) {
+  const { city, state } = splitLocation(r.location);
+  return {
+    company: {
+      companyName: name,
+      vertical: toVertical(r.industry),
+      city, state,
+      country: city || state ? "India" : "",
+      turnOverINR: toTurnoverBand(r.turnover),
+      leadSource: "Existing Database",
+      // Left empty on purpose — the sheet says nothing about these:
+      leadType: "", leadStatus: "", priority: "", leadAssignedTo: null,
+      website: "", address: "", genericEmail1: "", genericEmail2: "",
+      genericPhone1: "", genericPhone2: "", bdm: "", nextAction: "",
+      leadUsable: "", employeeCount: "", reason: "", expectedDealValue: "",
+      pipelineStage: "", dateField: "",
+      aboutTheCompany: r.industry || "",
+    },
+    contact: routeContacts(r.contacts || []),
+    itLandscape: {
+      netNew: r.erp ? { currentERP: toErpOption(r.erp), currentERPRaw: r.erp } : {},
+      SAPInstalledBase: {},
+    },
+    description: buildLeftoverNotes(r),
+    selectedOption: "",
+    radioValue: "",
+    createdBy: IMPORTER_ID,
+  };
+}
+
+// POSTs one lead and reports what happened — pulled out of the main loop so
+// that loop only has to handle "what to do with the outcome", not also the
+// HTTP call, the response-status branching and the error handling.
+async function submitLead(payload, name, token) {
+  const form = new FormData();
+  form.append("data", JSON.stringify(payload));
+
+  try {
+    const res = await fetch(`${API}/api/leads`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    const body = await res.json().catch(() => ({}));
+    if (res.status === 201) {
+      return { outcome: "created", message: `  ok   #${body.leadNumber}  ${name}` };
+    }
+    if (res.status === 409) {
+      return { outcome: "skipped", message: `${name}: duplicate — ${body.error || "already exists"}` };
+    }
+    return { outcome: "failed", message: `${name}: HTTP ${res.status} — ${body.error || JSON.stringify(body)}` };
+  } catch (err) {
+    return { outcome: "failed", message: `${name}: ${err.message}` };
+  }
+}
+
 (async () => {
   const records = JSON.parse(fs.readFileSync(SRC, "utf-8"));
   const token = jwt.sign(
@@ -143,83 +227,32 @@ function routeContacts(contacts) {
     { expiresIn: "60m" }
   );
 
-  let created = 0, skipped = 0, failed = 0;
+  const tally = { created: 0, skipped: 0, failed: 0 };
   const problems = [];
 
   for (const [i, r] of records.entries()) {
     const name = (r.companyName || "").trim();
-    if (!name) { skipped++; problems.push(`row ${i + 1}: no company name`); continue; }
-
-    const { city, state } = splitLocation(r.location);
-    const contacts = routeContacts(r.contacts || []);
-
-    // Anything the CRM has no column for is preserved here rather than lost.
-    const notes = [
-      "Imported from the 'Net new' spreadsheet.",
-      r.industry ? `Industry (as listed): ${r.industry}` : "",
-      r.turnover ? `Turnover (as listed): ${r.turnover}` : "",
-      r.erp ? `Existing ERP: ${r.erp}` : "",
-      r.location ? `Location (as listed): ${r.location}` : "",
-    ].filter(Boolean).join("\n");
-
-    const payload = {
-      company: {
-        companyName: name,
-        vertical: toVertical(r.industry),
-        city, state,
-        country: city || state ? "India" : "",
-        turnOverINR: toTurnoverBand(r.turnover),
-        leadSource: "Existing Database",
-        // Left empty on purpose — the sheet says nothing about these:
-        leadType: "", leadStatus: "", priority: "", leadAssignedTo: null,
-        website: "", address: "", genericEmail1: "", genericEmail2: "",
-        genericPhone1: "", genericPhone2: "", bdm: "", nextAction: "",
-        leadUsable: "", employeeCount: "", reason: "", expectedDealValue: "",
-        pipelineStage: "", dateField: "",
-        aboutTheCompany: r.industry || "",
-      },
-      contact: contacts,
-      itLandscape: {
-        netNew: r.erp ? { currentERP: toErpOption(r.erp), currentERPRaw: r.erp } : {},
-        SAPInstalledBase: {},
-      },
-      description: notes,
-      selectedOption: "",
-      radioValue: "",
-      createdBy: IMPORTER_ID,
-    };
-
-    if (DRY) {
-      if (i < 3) console.log(JSON.stringify(payload.company, null, 1));
-      created++;
+    if (!name) {
+      tally.skipped++;
+      problems.push(`row ${i + 1}: no company name`);
       continue;
     }
 
-    const form = new FormData();
-    form.append("data", JSON.stringify(payload));
+    const payload = buildLeadPayload(r, name);
 
-    try {
-      const res = await fetch(`${API}/api/leads`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-      });
-      const body = await res.json().catch(() => ({}));
-      if (res.status === 201) {
-        created++;
-        console.log(`  ok   #${body.leadNumber}  ${name}`);
-      } else if (res.status === 409) {
-        skipped++;
-        problems.push(`${name}: duplicate — ${body.error || "already exists"}`);
-      } else {
-        failed++;
-        problems.push(`${name}: HTTP ${res.status} — ${body.error || JSON.stringify(body)}`);
-      }
-    } catch (err) {
-      failed++;
-      problems.push(`${name}: ${err.message}`);
+    if (DRY) {
+      if (i < 3) console.log(JSON.stringify(payload.company, null, 1));
+      tally.created++;
+      continue;
     }
+
+    const { outcome, message } = await submitLead(payload, name, token);
+    tally[outcome]++;
+    if (outcome === "created") console.log(message);
+    else problems.push(message);
   }
+
+  const { created, skipped, failed } = tally;
 
   console.log("\n==============================");
   console.log(DRY ? "DRY RUN — nothing written" : "IMPORT COMPLETE");

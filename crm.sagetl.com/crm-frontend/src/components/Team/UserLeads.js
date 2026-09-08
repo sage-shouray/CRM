@@ -3,6 +3,7 @@ import { API_BASE_URL } from "../../config";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import LeadDetails from "../Leads/LeadDetails"; // Ensure you have this component
+import { formatDate } from "../../dateFormat";
 import "./UserLeads.css";
 
 const UserLeads = () => {
@@ -85,7 +86,7 @@ const UserLeads = () => {
   const getLatestDescriptionDate = (lead) => {
     if (lead.descriptions && lead.descriptions.length > 0) {
       const dates = lead.descriptions.map((desc) => new Date(desc.createdAt));
-      return new Date(Math.max(...dates)).toLocaleDateString();
+      return formatDate(new Date(Math.max(...dates)));
     }
     return "";
   };
@@ -103,7 +104,7 @@ const UserLeads = () => {
   return (
     <div className="user-leads-container">
       <h2 className="user-heading">Leads</h2>
-      <div >
+      <div className="table-scroll-wrapper">
         <table>
           <thead>
             <tr>
@@ -130,16 +131,14 @@ const UserLeads = () => {
                     {lead.leadNumber || ""}
                   </button>
                 </td>
-                <td>{new Date(lead.createdAt).toLocaleDateString()}</td>
+                <td>{formatDate(lead.createdAt)}</td>
                 <td>{lead.companyInfo?.["Company Name"] || ""}</td>
                 <td>{getLatestDescriptionDate(lead)}</td>
                 <td>{lead.createdBy?.firstName || ""}</td>
                 <td>{getAssignedUser(lead)}</td>
                 <td>{getPhoneNumbers(lead)}</td>
                 <td>
-                  {lead.companyInfo?.dateField
-                    ? new Date(lead.companyInfo.dateField).toLocaleDateString()
-                    : ""}
+                  {formatDate(lead.companyInfo?.dateField)}
                 </td>
                 <td>{lead.companyInfo?.Priority || ""}</td>
                 <td>{lead.companyInfo?.["Next Action"] || ""}</td>

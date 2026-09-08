@@ -3,6 +3,7 @@ import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faNoteSticky, faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { API_BASE_URL } from "../../config";
+import { formatDate } from "../../dateFormat";
 
 // Quick scratch notes for the signed-in user.
 //
@@ -141,9 +142,7 @@ function SidebarNotes() {
               <p>{note.text}</p>
               <div className="sidebar-note-foot">
                 <span>
-                  {note.createdAt
-                    ? new Date(note.createdAt).toLocaleDateString()
-                    : ""}
+                  {formatDate(note.createdAt)}
                 </span>
                 <button
                   type="button"

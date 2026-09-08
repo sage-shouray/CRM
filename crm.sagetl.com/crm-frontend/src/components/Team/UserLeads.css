@@ -98,3 +98,13 @@
   margin-bottom: 15px;
 }
 
+.table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll-wrapper table {
+  min-width: 850px;
+}
+

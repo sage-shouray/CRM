@@ -172,4 +172,52 @@
   border-radius: var(--radius-md);
 }
 
+/* A 13-column table cannot shrink to fit a phone screen — it scrolls inside
+   its own box instead of forcing the whole page to scroll sideways. */
+.table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.leads-display table {
+  min-width: 900px;
+}
+
+@media (max-width: 768px) {
+  .leads-display {
+    padding: 16px;
+  }
+
+  .display-filters {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .display-filter-item,
+  .contract-expiry-filter {
+    min-width: 140px;
+  }
+}
+
+@media (max-width: 480px) {
+  .leads-display {
+    padding: 12px;
+    border-radius: var(--radius-sm);
+  }
+
+  .leads-display-heading {
+    font-size: 18px;
+  }
+
+  .display-filters {
+    flex-direction: column;
+  }
+
+  .display-filter-item,
+  .contract-expiry-filter {
+    width: 100%;
+    min-width: 0;
+  }
+}
 
