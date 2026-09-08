@@ -625,3 +625,40 @@
   background: #eff6ff;
   border-color: #bfdbfe;
 }
+
+/* Column-mismatch rejection table — shown on step 1 when the uploaded file
+   doesn't exactly match the template's columns. */
+.bi-mismatch-block {
+  margin-top: 18px;
+  text-align: left;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+}
+
+.bi-mismatch-block h3 {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  color: #b91c1c;
+}
+
+.bi-mismatch-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.bi-mismatch-table th,
+.bi-mismatch-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #fecaca;
+  text-align: left;
+}
+
+.bi-mismatch-table th {
+  color: #991b1b;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10.5px;
+}

@@ -25,30 +25,13 @@ const {
   canManageTeam,
 } = require("./Middleware/roles");
 const { getDescendantUserIds } = require("./Models/db");
-const { FIELD_CATALOG } = require("./Models/bulkImportFields");
 const {
   readWorkbook,
   sheetToRows,
   detectHeaderRowIndex,
-  autoMapAndSplit,
   normalizeText,
-  transformRows,
 } = require("./Models/bulkImportTransform");
-
-// Shared by /parse (to show the admin what it guessed) and /auto-import's
-// zero-touch mode (to actually use the guess): the column mapping plus any
-// combined-column split rules, worked out purely from the file itself — no
-// admin input required for a normally-shaped file.
-function computeAutoMapping(rows, headerRowIndex) {
-  const headers = (rows[headerRowIndex] || []).map((h) => normalizeText(h)).filter(Boolean);
-  const dataRows = rows.slice(headerRowIndex + 1, headerRowIndex + 41); // wide enough sample to classify columns confidently
-  const sampleValuesByHeader = {};
-  headers.forEach((h, idx) => {
-    sampleValuesByHeader[h] = dataRows.map((r) => r[idx]);
-  });
-  const { mapping, splitRules } = autoMapAndSplit(headers, sampleValuesByHeader);
-  return { headers, mapping, splitRules };
-}
+const { TEMPLATE_COLUMNS, validateAgainstTemplate, transformTemplateRows } = require("./Models/bulkImportTemplate");
 const { validate, createUserSchema, updateUserSchema, taskSchema } = require("./Middleware/validation");
 const AuthRouter = require("./Routes/AuthRouter");
 const OptionsRouter = require("./Routes/OptionsRouter");
@@ -1308,89 +1291,19 @@ app.post("/api/cold-leads/:leadNumber/return", authenticateToken, async (req, re
 });
 
 // --- Bulk Import (Admin) ----------------------------------------------------
-// Turns an arbitrary vendor Excel file — any column names, any order, extra
-// junk rows — into Cold-pool leads. Two steps: /parse reads the file and
-// returns headers/sample rows/a best-guess mapping for the admin to confirm
-// or correct; /commit re-reads the (re-uploaded) file with that confirmed
-// mapping and actually creates the leads. Nothing is held in server memory
-// between the two calls — the browser just sends the file again on commit,
-// which keeps this stateless and avoids needing file storage or sessions.
-app.get(
-  "/api/bulk-import/fields",
-  authenticateToken,
-  checkRole([ROLES.ADMIN]),
-  (req, res) => {
-    res.json({ fields: FIELD_CATALOG });
-  }
-);
-
-app.post(
-  "/api/bulk-import/parse",
-  authenticateToken,
-  checkRole([ROLES.ADMIN]),
-  upload.single("file"),
-  async (req, res) => {
-    try {
-      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const sheetIndex = Number.parseInt(req.body.sheetIndex, 10) || 0;
-
-      const workbook = await readWorkbook(req.file.buffer);
-      const sheetNames = workbook.worksheets.map((ws) => ws.name);
-      const worksheet = workbook.worksheets[sheetIndex] || workbook.worksheets[0];
-      if (!worksheet) return res.status(400).json({ error: "That file has no sheets" });
-
-      const rows = sheetToRows(worksheet);
-      const requestedHeaderRow = req.body.headerRowIndex !== undefined
-        ? Number.parseInt(req.body.headerRowIndex, 10)
-        : undefined;
-      const headerRowIndex = Number.isInteger(requestedHeaderRow)
-        ? requestedHeaderRow
-        : detectHeaderRowIndex(rows);
-
-      const { headers, mapping: suggestedMapping, splitRules: suggestedSplitRules } =
-        computeAutoMapping(rows, headerRowIndex);
-      const sampleRows = rows
-        .slice(headerRowIndex + 1, headerRowIndex + 6)
-        .map((r) => r.map((c) => normalizeText(c)));
-      const totalDataRows = Math.max(0, rows.length - headerRowIndex - 1);
-
-      res.json({
-        sheetNames,
-        sheetIndex,
-        headerRowIndex,
-        headers,
-        sampleRows,
-        suggestedMapping,
-        suggestedSplitRules,
-        totalDataRows,
-        fields: FIELD_CATALOG,
-      });
-    } catch (error) {
-      console.error("Error parsing bulk-import file:", error);
-      res.status(400).json({ error: "Could not read that file — is it a valid Excel file?" });
-    }
-  }
-);
-
-// Nothing from Bulk Import writes to the database without the admin having
-// first seen exactly what's about to be pushed — how many companies, what
-// fields they carry, and which ones already exist. That's what /preview
-// (and its zero-touch sibling /auto-preview) is for: it runs the file all
-// the way through the transform and duplicate check, same as a commit
-// would, but never calls .save(). The admin reviews the resulting
-// confirmation list — including a per-duplicate choice, not just a blanket
-// one — and only /commit actually writes anything, using exactly the
-// mapping the preview used.
+// Strict template mode: no fuzzy header guessing, no manual mapping. A file
+// is only ever accepted if its header row matches the CRM Lead Data Entry
+// Template's 58 columns exactly — same count, same headers, same order.
+// Anything else is rejected outright, with the exact column-by-column
+// mismatch shown, before a single row is even read. Only a file that
+// passes this check gets duplicate-tested (/preview) and, on explicit
+// confirmation, actually written (/commit).
 
 // Builds the per-company summary the confirmation screen shows, and decides
-// which rows are duplicates. Two different kinds, kept distinct on purpose:
-//  - "in this file" — the same company appears more than once in the
-//    upload itself. This is never optional: only the first occurrence can
-//    ever be imported, no matter what the admin later chooses for database
-//    duplicates, so the UI must show this as a hard fact up front, not a
-//    choice.
-//  - "in the database" — the company already exists as a lead. This one IS
-//    the admin's choice (skip vs push), made on the confirmation screen.
+// which rows are duplicates — both against what's already in the database
+// and against each other (two rows in the same file for the same company,
+// case/spacing aside, are duplicates of each other even before either one
+// is saved).
 async function summarizeCompaniesForPreview(leadsData) {
   const seenInBatch = new Map(); // normalized name -> the DB lead number it already matched (or null)
   const companies = [];
@@ -1455,118 +1368,39 @@ async function commitLeads(leadsData, includeDuplicates) {
   const created = [];
   const skippedDuplicates = [];
   const pushedDespiteDuplicate = [];
-  // Maps a normalized company name to the lead number that filled it in
-  // this batch — either an existing DB lead, or one this same commit just
-  // created — so every later occurrence of that company, however it arose,
-  // always resolves against the one true "first" answer.
   const seenInBatch = new Map();
 
   for (const leadData of leadsData) {
     const name = leadData.companyInfo.companyName;
     const normalized = normalizeCompanyName(name);
+    let isDuplicate = seenInBatch.has(normalized);
+    let existingLeadNumber = isDuplicate ? seenInBatch.get(normalized) : null;
 
-    if (seenInBatch.has(normalized)) {
-      // Already handled earlier in this exact file — never inserted a
-      // second time, regardless of the duplicate choice.
-      skippedDuplicates.push({
-        companyName: name,
-        existingLeadNumber: seenInBatch.get(normalized),
-        reason: "repeated within this file",
-      });
-      continue;
+    if (!isDuplicate) {
+      const existing = await findLeadByCompanyName(name);
+      if (existing) {
+        isDuplicate = true;
+        existingLeadNumber = existing.lead_number;
+      }
     }
 
-    const existing = await findLeadByCompanyName(name);
-    const isDbDuplicate = Boolean(existing);
-
-    if (isDbDuplicate && !includeDuplicates) {
-      skippedDuplicates.push({ companyName: name, existingLeadNumber: existing.lead_number, reason: "already in the database" });
-      seenInBatch.set(normalized, existing.lead_number);
+    if (isDuplicate && !includeDuplicates) {
+      skippedDuplicates.push({ companyName: name, existingLeadNumber });
       continue;
     }
-    if (isDbDuplicate) {
-      pushedDespiteDuplicate.push({ companyName: name, existingLeadNumber: existing.lead_number });
+    if (isDuplicate) {
+      pushedDespiteDuplicate.push({ companyName: name, existingLeadNumber });
     }
 
     const lead = new Lead(leadData);
     const saved = await lead.save();
     created.push(saved.leadNumber);
-    seenInBatch.set(normalized, saved.leadNumber);
+    if (!seenInBatch.has(normalized)) seenInBatch.set(normalized, saved.leadNumber);
   }
 
   return { created, skippedDuplicates, pushedDespiteDuplicate };
 }
 
-// Zero-touch preview: file only. Detects the header row, maps every column
-// (including auto-splitting a combined "Name | Mobile | Email" column), and
-// runs the full duplicate check — but doesn't write anything. The response
-// carries the exact mapping/splitRules/headerRowIndex it used, which the
-// frontend sends straight back to /commit so the write uses the identical
-// interpretation the admin actually reviewed.
-app.post(
-  "/api/bulk-import/auto-preview",
-  authenticateToken,
-  checkRole([ROLES.ADMIN]),
-  upload.single("file"),
-  async (req, res) => {
-    try {
-      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const sheetIndex = Number.parseInt(req.body.sheetIndex, 10) || 0;
-
-      const workbook = await readWorkbook(req.file.buffer);
-      const worksheet = workbook.worksheets[sheetIndex] || workbook.worksheets[0];
-      if (!worksheet) return res.status(400).json({ error: "That file has no sheets" });
-      const rows = sheetToRows(worksheet);
-
-      const headerRowIndex = detectHeaderRowIndex(rows);
-      const { mapping, splitRules } = computeAutoMapping(rows, headerRowIndex);
-
-      if (!mapping.companyName) {
-        return res.status(422).json({
-          error: "Could not confidently find a Company Name column in this file — use manual mapping instead.",
-          needsManualMapping: true,
-          headerRowIndex,
-        });
-      }
-
-      const MAX_ROWS = 5000;
-      if (rows.length - headerRowIndex - 1 > MAX_ROWS) {
-        return res.status(400).json({ error: `That's more than ${MAX_ROWS} rows — split the file and import in batches.` });
-      }
-
-      const { leadsData, skipped } = transformRows({
-        rows,
-        headerRowIndex,
-        mapping,
-        splitRules,
-        originalFileName: req.file.originalname,
-        importedBy: req.user.id,
-      });
-      const { companies, duplicateCount, inFileDuplicateCount, dbDuplicateCount } =
-        await summarizeCompaniesForPreview(leadsData);
-
-      res.json({
-        sheetIndex,
-        headerRowIndex,
-        mapping,
-        splitRules,
-        totalCount: companies.length,
-        duplicateCount,
-        inFileDuplicateCount,
-        dbDuplicateCount,
-        skipped,
-        companies,
-      });
-    } catch (error) {
-      console.error("Error previewing bulk-import file:", error);
-      res.status(400).json({ error: "Could not read that file — is it a valid Excel file?" });
-    }
-  }
-);
-
-// Manual-mapping preview — same duplicate-check + summary as auto-preview,
-// but using the mapping the admin chose on the mapping screen instead of
-// guessing one.
 app.post(
   "/api/bulk-import/preview",
   authenticateToken,
@@ -1575,30 +1409,34 @@ app.post(
   async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const sheetIndex = Number.parseInt(req.body.sheetIndex, 10) || 0;
-      const headerRowIndex = Number.parseInt(req.body.headerRowIndex, 10) || 0;
-      const mapping = JSON.parse(req.body.mapping || "{}");
-      const splitRules = JSON.parse(req.body.splitRules || "[]");
-
-      if (!mapping.companyName) {
-        return res.status(400).json({ error: "Company Name must be mapped to a column before importing" });
-      }
 
       const workbook = await readWorkbook(req.file.buffer);
-      const worksheet = workbook.worksheets[sheetIndex] || workbook.worksheets[0];
+      const worksheet = workbook.worksheets[0];
       if (!worksheet) return res.status(400).json({ error: "That file has no sheets" });
       const rows = sheetToRows(worksheet);
+
+      const headerRowIndex = detectHeaderRowIndex(rows);
+      const headers = (rows[headerRowIndex] || []).map((h) => normalizeText(h)).filter(Boolean);
+      const { valid, mismatches } = validateAgainstTemplate(headers);
+
+      if (!valid) {
+        return res.status(422).json({
+          error: "This file's columns don't match the CRM Lead Data Entry Template exactly.",
+          templateMismatch: true,
+          mismatches,
+          expectedColumnCount: TEMPLATE_COLUMNS.length,
+          foundColumnCount: headers.length,
+        });
+      }
 
       const MAX_ROWS = 5000;
       if (rows.length - headerRowIndex - 1 > MAX_ROWS) {
         return res.status(400).json({ error: `That's more than ${MAX_ROWS} rows — split the file and import in batches.` });
       }
 
-      const { leadsData, skipped } = transformRows({
+      const { leadsData, skipped } = transformTemplateRows({
         rows,
         headerRowIndex,
-        mapping,
-        splitRules,
         originalFileName: req.file.originalname,
         importedBy: req.user.id,
       });
@@ -1606,10 +1444,7 @@ app.post(
         await summarizeCompaniesForPreview(leadsData);
 
       res.json({
-        sheetIndex,
         headerRowIndex,
-        mapping,
-        splitRules,
         totalCount: companies.length,
         duplicateCount,
         inFileDuplicateCount,
@@ -1624,10 +1459,9 @@ app.post(
   }
 );
 
-// The only route that actually writes leads. Always takes the exact
-// mapping/splitRules/headerRowIndex a preview call just returned, plus the
-// admin's explicit includeDuplicates choice from that confirmation screen —
-// there is no path into the Cold Pool that skips the preview step.
+// The only route that writes leads. Re-validates the template match itself
+// (never trusts that a prior /preview call on the same file is still true —
+// the file could have changed) before touching the database at all.
 app.post(
   "/api/bulk-import/commit",
   authenticateToken,
@@ -1636,43 +1470,41 @@ app.post(
   async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const sheetIndex = Number.parseInt(req.body.sheetIndex, 10) || 0;
-      const headerRowIndex = Number.parseInt(req.body.headerRowIndex, 10) || 0;
-      const mapping = JSON.parse(req.body.mapping || "{}");
-      const splitRules = JSON.parse(req.body.splitRules || "[]");
       const includeDuplicates = req.body.includeDuplicates === "true" || req.body.includeDuplicates === true;
 
-      if (!mapping.companyName) {
-        return res.status(400).json({ error: "Company Name must be mapped to a column before importing" });
-      }
-
       const workbook = await readWorkbook(req.file.buffer);
-      const worksheet = workbook.worksheets[sheetIndex] || workbook.worksheets[0];
+      const worksheet = workbook.worksheets[0];
       if (!worksheet) return res.status(400).json({ error: "That file has no sheets" });
       const rows = sheetToRows(worksheet);
+
+      const headerRowIndex = detectHeaderRowIndex(rows);
+      const headers = (rows[headerRowIndex] || []).map((h) => normalizeText(h)).filter(Boolean);
+      const { valid, mismatches } = validateAgainstTemplate(headers);
+      if (!valid) {
+        return res.status(422).json({
+          error: "This file's columns don't match the CRM Lead Data Entry Template exactly.",
+          templateMismatch: true,
+          mismatches,
+        });
+      }
 
       const MAX_ROWS = 5000;
       if (rows.length - headerRowIndex - 1 > MAX_ROWS) {
         return res.status(400).json({ error: `That's more than ${MAX_ROWS} rows — split the file and import in batches.` });
       }
 
-      const { leadsData, skipped } = transformRows({
+      const { leadsData, skipped } = transformTemplateRows({
         rows,
         headerRowIndex,
-        mapping,
-        splitRules,
         originalFileName: req.file.originalname,
         importedBy: req.user.id,
       });
 
-      const { created, skippedDuplicates, pushedDespiteDuplicate } = await commitLeads(
-        leadsData,
-        includeDuplicates
-      );
+      const { created, skippedDuplicates, pushedDespiteDuplicate } = await commitLeads(leadsData, includeDuplicates);
 
       if (created.length) {
         broadcastChange("leads", "created", { count: created.length, bulkImport: true });
-        broadcastChange("cold-leads", "pulled", { count: 0 }); // nudge any open Cold Pool views to refresh
+        broadcastChange("cold-leads", "pulled", { count: 0 });
       }
 
       res.json({
@@ -1681,66 +1513,10 @@ app.post(
         skipped,
         duplicates: skippedDuplicates,
         pushedDespiteDuplicate,
-        mappingUsed: mapping,
-        splitRulesUsed: splitRules,
       });
     } catch (error) {
       console.error("Error committing bulk import:", error);
       res.status(500).json({ error: "Error importing leads from that file" });
-    }
-  }
-);
-
-app.get(
-  "/api/bulk-import/presets",
-  authenticateToken,
-  checkRole([ROLES.ADMIN]),
-  async (req, res) => {
-    try {
-      const result = await mongoose.pool.query(
-        `SELECT id, name, mapping, split_rules AS "splitRules", created_at AS "createdAt"
-         FROM import_mapping_presets ORDER BY created_at DESC`
-      );
-      res.json(result.rows);
-    } catch (error) {
-      console.error("Error listing import presets:", error);
-      res.status(500).json({ error: "Error listing saved mappings" });
-    }
-  }
-);
-
-app.post(
-  "/api/bulk-import/presets",
-  authenticateToken,
-  checkRole([ROLES.ADMIN]),
-  async (req, res) => {
-    try {
-      const { name, mapping, splitRules } = req.body || {};
-      if (!name || !name.trim()) return res.status(400).json({ error: "Name is required" });
-      const result = await mongoose.pool.query(
-        `INSERT INTO import_mapping_presets (name, mapping, split_rules, created_by)
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        [name.trim(), JSON.stringify(mapping || {}), JSON.stringify(splitRules || []), req.user.id]
-      );
-      res.status(201).json({ id: result.rows[0].id });
-    } catch (error) {
-      console.error("Error saving import preset:", error);
-      res.status(500).json({ error: "Error saving this mapping" });
-    }
-  }
-);
-
-app.delete(
-  "/api/bulk-import/presets/:id",
-  authenticateToken,
-  checkRole([ROLES.ADMIN]),
-  async (req, res) => {
-    try {
-      await mongoose.pool.query(`DELETE FROM import_mapping_presets WHERE id = $1`, [req.params.id]);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting import preset:", error);
-      res.status(500).json({ error: "Error deleting this mapping" });
     }
   }
 );

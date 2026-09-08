@@ -12,7 +12,11 @@
 const FIELD_CATALOG = [
   // --- Company -----------------------------------------------------------
   { key: "companyName", label: "Company Name", group: "Company", kind: "text", required: true,
-    aliases: ["company", "company name", "companyname", "comp name", "comp", "co name", "firm", "firm name", "organisation", "organization", "org name", "account name", "account", "business name"] },
+    // Deliberately does NOT include "business name" — a real template column
+    // called "Business - Name" (a Business Head contact's own name) exactly
+    // matches that alias, and previously out-scored the real "Company Name"
+    // column on a tie-break, silently mapping the wrong column.
+    aliases: ["company", "company name", "companyname", "comp name", "comp", "co name", "firm", "firm name", "organisation", "organization", "org name", "account name", "account"] },
   { key: "vertical", label: "Vertical", group: "Company", kind: "text",
     aliases: ["vertical", "industry", "sector", "segment"] },
   { key: "website", label: "Website", group: "Company", kind: "text",
@@ -58,13 +62,15 @@ const FIELD_CATALOG = [
 
   // --- Business Head contact ---------------------------------------------
   { key: "businessHeadName", label: "Business Head — Name", group: "Business Head Contact", kind: "text",
-    aliases: ["business head", "ceo", "md", "director", "owner", "promoter"] },
+    // "business name" deliberately lives here, not on Company Name — see
+    // the note on that field for why the collision mattered.
+    aliases: ["business head", "business name", "ceo", "md", "director", "owner", "promoter"] },
   { key: "businessHeadDesignation", label: "Business Head — Designation", group: "Business Head Contact", kind: "text",
-    aliases: ["business head designation"] },
+    aliases: ["business head designation", "business designation"] },
   { key: "businessHeadMobile", label: "Business Head — Mobile", group: "Business Head Contact", kind: "phone",
-    aliases: ["business head mobile", "ceo mobile", "md mobile"] },
+    aliases: ["business head mobile", "business mobile", "ceo mobile", "md mobile"] },
   { key: "businessHeadEmail", label: "Business Head — Email", group: "Business Head Contact", kind: "email",
-    aliases: ["business head email", "ceo email", "md email"] },
+    aliases: ["business head email", "business email", "ceo email", "md email"] },
 ];
 
 // Field keys that make up one lead's set of usable "reach" details — used
